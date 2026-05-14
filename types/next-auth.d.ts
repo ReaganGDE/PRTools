@@ -5,7 +5,7 @@ declare module "next-auth" {
     user: {
       id: string;
       workspaceId: string | null;
-      role: "owner" | "admin" | "member";
+      role: "owner" | "admin" | "member" | "viewer";
     } & DefaultSession["user"];
   }
 }

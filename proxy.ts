@@ -6,6 +6,7 @@ const PUBLIC_PATHS = [
   "/verify",
   "/api/auth",
   "/api/webhooks",
+  "/api/cron",
   "/u/",
   "/_next",
   "/favicon",

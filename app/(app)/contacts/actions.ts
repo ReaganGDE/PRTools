@@ -5,7 +5,7 @@ import { z } from "zod";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { contacts, contactLists, contactListMembers } from "@/lib/db/schema";
-import { requireSession } from "@/lib/auth-helpers";
+import { requireSessionWithCap } from "@/lib/auth-helpers";
 
 const PLATFORMS = [
   "instagram",
@@ -54,7 +54,7 @@ function fromFormData(fd: FormData) {
 }
 
 export async function createContact(formData: FormData) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("contacts.create");
   const parsed = ContactInput.safeParse(fromFormData(formData));
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
@@ -86,7 +86,7 @@ export async function createContact(formData: FormData) {
 }
 
 export async function updateContact(id: string, formData: FormData) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("contacts.edit");
   const parsed = ContactInput.safeParse(fromFormData(formData));
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
@@ -118,7 +118,7 @@ export async function updateContact(id: string, formData: FormData) {
 }
 
 export async function deleteContact(id: string) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("contacts.delete");
   await db
     .delete(contacts)
     .where(
@@ -159,7 +159,7 @@ export async function importCsv(args: {
   defaultType?: "influencer" | "outlet" | "journalist";
   tagsToApply?: string[];
 }) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("contacts.import");
   const { rows, map, defaultType = "influencer", tagsToApply = [] } = args;
 
   let inserted = 0;
@@ -254,7 +254,7 @@ export async function importCsv(args: {
 /* ────────────────────── Contact lists ────────────────────── */
 
 export async function createList(name: string) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("lists.create");
   const trimmed = name.trim();
   if (!trimmed) return { ok: false as const, error: "Name required" };
   const [row] = await db
@@ -266,7 +266,7 @@ export async function createList(name: string) {
 }
 
 export async function addContactToList(contactId: string, listId: string) {
-  await requireSession();
+  await requireSessionWithCap("lists.edit");
   await db
     .insert(contactListMembers)
     .values({ contactId, listId })
@@ -278,7 +278,7 @@ export async function removeContactFromList(
   contactId: string,
   listId: string,
 ) {
-  await requireSession();
+  await requireSessionWithCap("lists.edit");
   await db
     .delete(contactListMembers)
     .where(
@@ -291,7 +291,7 @@ export async function removeContactFromList(
 }
 
 export async function bulkTag(contactIds: string[], tags: string[]) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("contacts.edit");
   if (contactIds.length === 0 || tags.length === 0) return;
   // Append tags, dedupe in SQL
   for (const id of contactIds) {

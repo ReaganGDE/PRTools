@@ -99,7 +99,12 @@ export const socialPostStatusEnum = pgEnum("social_post_status", [
   "failed",
 ]);
 
-export const userRoleEnum = pgEnum("user_role", ["owner", "admin", "member"]);
+export const userRoleEnum = pgEnum("user_role", [
+  "owner",
+  "admin",
+  "member",
+  "viewer",
+]);
 
 /* ───────────────────── Auth (NextAuth) ───────────────────── */
 

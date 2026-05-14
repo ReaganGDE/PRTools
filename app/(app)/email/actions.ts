@@ -12,7 +12,7 @@ import {
   sends,
   emailSuppressions,
 } from "@/lib/db/schema";
-import { requireSession } from "@/lib/auth-helpers";
+import { requireSessionWithCap } from "@/lib/auth-helpers";
 import { resend } from "@/lib/email/resend";
 import { renderTemplate, listMergeFields } from "@/lib/email/render-template";
 import { unsubscribeFooter } from "@/lib/email/footer";
@@ -27,7 +27,7 @@ const TemplateInput = z.object({
 });
 
 export async function createTemplate(formData: FormData) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("email.template.create");
   const parsed = TemplateInput.parse({
     name: formData.get("name"),
     subject: formData.get("subject"),
@@ -49,7 +49,7 @@ export async function createTemplate(formData: FormData) {
 }
 
 export async function updateTemplate(id: string, formData: FormData) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("email.template.edit");
   const parsed = TemplateInput.parse({
     name: formData.get("name"),
     subject: formData.get("subject"),
@@ -75,7 +75,7 @@ export async function updateTemplate(id: string, formData: FormData) {
 }
 
 export async function deleteTemplate(id: string) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("email.template.delete");
   await db
     .delete(messageTemplates)
     .where(
@@ -97,7 +97,7 @@ const CampaignInput = z.object({
 });
 
 export async function createCampaign(formData: FormData) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("email.campaign.create");
   const parsed = CampaignInput.parse({
     name: formData.get("name"),
     templateId: formData.get("templateId"),
@@ -120,7 +120,7 @@ export async function createCampaign(formData: FormData) {
 }
 
 export async function sendCampaign(campaignId: string) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("email.campaign.send");
 
   const [campaign] = await db
     .select()

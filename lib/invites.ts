@@ -4,6 +4,7 @@ import { resend } from "@/lib/email/resend";
 import { env } from "@/lib/env";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import type { Role } from "@/lib/permissions";
 
 const INVITE_TTL_DAYS = 7;
 
@@ -11,12 +12,15 @@ export async function createInvite(args: {
   workspaceId: string;
   email: string;
   invitedBy: string;
-  role?: "admin" | "member";
+  role?: Role;
 }) {
   const token = nanoid(32);
   const expiresAt = new Date(
     Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000,
   );
+
+  // Owner can only be transferred, not directly invited
+  const role: Role = args.role && args.role !== "owner" ? args.role : "member";
 
   const [invite] = await db
     .insert(workspaceInvites)
@@ -24,7 +28,7 @@ export async function createInvite(args: {
       workspaceId: args.workspaceId,
       email: args.email.toLowerCase(),
       invitedBy: args.invitedBy,
-      role: args.role ?? "member",
+      role,
       token,
       expiresAt,
     })
@@ -40,7 +44,7 @@ export async function createInvite(args: {
     from: env.EMAIL_FROM,
     to: args.email,
     subject: `You're invited to ${ws?.name ?? "a workspace"}`,
-    html: `<p>You've been invited to join <strong>${ws?.name}</strong> on Influencer & PR Tracker.</p>
+    html: `<p>You've been invited to join <strong>${ws?.name}</strong> on Influencer & PR Tracker as <strong>${role}</strong>.</p>
            <p><a href="${url}">Accept the invite</a></p>
            <p>This link expires in ${INVITE_TTL_DAYS} days.</p>`,
   });
@@ -77,9 +81,19 @@ export async function listInvites(workspaceId: string) {
   return db
     .select()
     .from(workspaceInvites)
+    .where(and(eq(workspaceInvites.workspaceId, workspaceId)));
+}
+
+export async function revokeInvite(args: {
+  workspaceId: string;
+  inviteId: string;
+}) {
+  await db
+    .delete(workspaceInvites)
     .where(
       and(
-        eq(workspaceInvites.workspaceId, workspaceId),
+        eq(workspaceInvites.id, args.inviteId),
+        eq(workspaceInvites.workspaceId, args.workspaceId),
       ),
     );
 }

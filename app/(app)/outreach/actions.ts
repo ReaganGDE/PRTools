@@ -11,7 +11,7 @@ import {
   sends,
   messageTemplates,
 } from "@/lib/db/schema";
-import { requireSession } from "@/lib/auth-helpers";
+import { requireSession, requireSessionWithCap } from "@/lib/auth-helpers";
 import { renderTemplate, listMergeFields } from "@/lib/email/render-template";
 
 const PLATFORM = z.enum(["instagram", "tiktok", "reddit", "youtube"]);
@@ -25,7 +25,7 @@ const CampaignInput = z.object({
 });
 
 export async function createWorkbenchCampaign(formData: FormData) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("outreach.campaign.create");
   const parsed = CampaignInput.parse({
     name: formData.get("name"),
     platform: formData.get("platform"),
@@ -173,7 +173,7 @@ const MarkInput = z.object({
 });
 
 export async function markOutcome(input: z.infer<typeof MarkInput>) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("outreach.send");
   const parsed = MarkInput.parse(input);
 
   const [campaign] = await db
@@ -204,7 +204,7 @@ export async function markOutcome(input: z.infer<typeof MarkInput>) {
 }
 
 export async function completeCampaign(campaignId: string) {
-  const session = await requireSession();
+  const session = await requireSessionWithCap("outreach.campaign.create");
   await db
     .update(campaigns)
     .set({ status: "completed", updatedAt: new Date() })
