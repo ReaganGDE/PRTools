@@ -66,11 +66,21 @@ Open http://localhost:3000 → enter your email → check inbox → click magic 
 | `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | https://www.reddit.com/prefs/apps → Create app → type=script. Set `REDDIT_USER_AGENT` to something like `influencer-pr-tracker/0.1 by u/yourusername` |
 | `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | https://www.inngest.com → free Cloud account → app keys |
 
+### Phase 6 — Social posting (OneUp)
+
+Social posting is routed through [OneUp](https://www.oneupapp.io). Connect every account you want to post to (IG, FB, Reddit, X, LinkedIn, Pinterest, GBP, Threads, YouTube, TikTok, Snapchat, Bluesky) inside OneUp, then group them into a Category.
+
+| Var | How to get |
+|---|---|
+| `ONEUP_API_KEY` | https://www.oneupapp.io/api-access → Generate API Key |
+
+File upload via the Upload Media endpoint requires OneUp's **Growth or Business** plan. On Starter, users can still paste public image/video URLs.
+
 ### Phase 4b — Reddit DM automation
 
-Uses the same Reddit credentials from Phase 5.
+Uses Reddit credentials from Phase 5. Note: Reddit closed self-service API access in 2026 — new approvals are rare. The DM client (`lib/platforms/reddit.ts`) is kept in the codebase but won't work without an approved Reddit API app.
 
-### Phase 4b/6 — Instagram + Facebook posting (optional)
+### Phase 4b/6 — Instagram + Facebook direct posting (optional, superseded by OneUp)
 
 | Var | How to get |
 |---|---|
