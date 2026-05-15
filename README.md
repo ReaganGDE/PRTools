@@ -26,10 +26,13 @@ npm run dev
 ## Roadmap
 
 - [x] **Phase 1** — Foundation (auth, workspaces, base layout)
-- [ ] **Phase 2** — Contacts (CSV import, manual entry, lists)
-- [ ] **Phase 3** — Email & press releases (templates, campaigns, tracking)
-- [ ] **Phase 4** — Outreach Workbench (semi-auto DM helper)
-- [ ] **Phase 4b** — Reddit full automation
-- [ ] **Phase 5** — Sentiment monitoring
-- [ ] **Phase 6** — Social poster
-- [ ] **Phase 7** — Polish (audit log, unified inbox, exports)
+- [x] **Phase 2** — Contacts (CSV import, manual entry, lists)
+- [x] **Phase 3** — Email & press releases (templates, campaigns, tracking)
+- [x] **Phase 4** — Outreach Workbench (semi-auto DM helper)
+- [x] **Phase 4b** — Reddit full automation
+- [x] **Phase 5** — Sentiment monitoring
+- [x] **Phase 6** — Social poster
+- [ ] **Phase 7** — Polish
+  - [x] Unified inbox (DMs + email replies)
+  - [ ] Audit log
+  - [ ] Exports (CSV)
