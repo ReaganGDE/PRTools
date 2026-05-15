@@ -6,6 +6,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { contacts, contactLists, contactListMembers } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
+import { logAudit } from "@/lib/audit";
 
 const PLATFORMS = [
   "instagram",
@@ -81,6 +82,15 @@ export async function createContact(formData: FormData) {
     })
     .returning({ id: contacts.id });
 
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "contact.create",
+    targetType: "contact",
+    targetId: row.id,
+    meta: { name: data.name, type: data.type },
+  });
+
   revalidatePath("/contacts");
   redirect(`/contacts/${row.id}`);
 }
@@ -113,17 +123,39 @@ export async function updateContact(id: string, formData: FormData) {
     .where(
       and(eq(contacts.id, id), eq(contacts.workspaceId, session.workspaceId)),
     );
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "contact.update",
+    targetType: "contact",
+    targetId: id,
+    meta: { name: data.name },
+  });
   revalidatePath(`/contacts/${id}`);
   revalidatePath("/contacts");
 }
 
 export async function deleteContact(id: string) {
   const session = await requireSessionWithCap("contacts.delete");
+  const [existing] = await db
+    .select({ name: contacts.name })
+    .from(contacts)
+    .where(
+      and(eq(contacts.id, id), eq(contacts.workspaceId, session.workspaceId)),
+    );
   await db
     .delete(contacts)
     .where(
       and(eq(contacts.id, id), eq(contacts.workspaceId, session.workspaceId)),
     );
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "contact.delete",
+    targetType: "contact",
+    targetId: id,
+    meta: existing ? { name: existing.name } : undefined,
+  });
   revalidatePath("/contacts");
   redirect("/contacts");
 }
@@ -247,6 +279,14 @@ export async function importCsv(args: {
     inserted++;
   }
 
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "contact.import",
+    targetType: "contact",
+    meta: { inserted, updated, skipped, defaultType, tagsToApply },
+  });
+
   revalidatePath("/contacts");
   return { ok: true as const, inserted, updated, skipped };
 }
@@ -261,6 +301,14 @@ export async function createList(name: string) {
     .insert(contactLists)
     .values({ workspaceId: session.workspaceId, name: trimmed })
     .returning({ id: contactLists.id });
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "list.create",
+    targetType: "list",
+    targetId: row.id,
+    meta: { name: trimmed },
+  });
   revalidatePath("/contacts");
   return { ok: true as const, id: row.id };
 }
@@ -293,6 +341,12 @@ export async function removeContactFromList(
 export async function bulkTag(contactIds: string[], tags: string[]) {
   const session = await requireSessionWithCap("contacts.edit");
   if (contactIds.length === 0 || tags.length === 0) return;
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "contact.bulk_tag",
+    meta: { contactCount: contactIds.length, tags },
+  });
   // Append tags, dedupe in SQL
   for (const id of contactIds) {
     await db

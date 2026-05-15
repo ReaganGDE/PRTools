@@ -32,7 +32,7 @@ npm run dev
 - [x] **Phase 4b** — Reddit full automation
 - [x] **Phase 5** — Sentiment monitoring
 - [x] **Phase 6** — Social poster
-- [ ] **Phase 7** — Polish
+- [x] **Phase 7** — Polish
   - [x] Unified inbox (DMs + email replies)
-  - [ ] Audit log
-  - [ ] Exports (CSV)
+  - [x] Audit log (workspace activity, admin-only view)
+  - [x] Exports (CSV for contacts, sends, mentions)

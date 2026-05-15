@@ -13,6 +13,7 @@ import {
   emailSuppressions,
 } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
+import { logAudit } from "@/lib/audit";
 import { resend } from "@/lib/email/resend";
 import { renderTemplate, listMergeFields } from "@/lib/email/render-template";
 import { unsubscribeFooter } from "@/lib/email/footer";
@@ -44,6 +45,14 @@ export async function createTemplate(formData: FormData) {
       mergeFields: listMergeFields(`${parsed.subject}\n${parsed.body}`),
     })
     .returning({ id: messageTemplates.id });
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "email.template.create",
+    targetType: "template",
+    targetId: row.id,
+    meta: { name: parsed.name },
+  });
   revalidatePath("/email");
   redirect(`/email/templates/${row.id}`);
 }
@@ -70,6 +79,14 @@ export async function updateTemplate(id: string, formData: FormData) {
         eq(messageTemplates.workspaceId, session.workspaceId),
       ),
     );
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "email.template.update",
+    targetType: "template",
+    targetId: id,
+    meta: { name: parsed.name },
+  });
   revalidatePath(`/email/templates/${id}`);
   revalidatePath("/email");
 }
@@ -84,6 +101,13 @@ export async function deleteTemplate(id: string) {
         eq(messageTemplates.workspaceId, session.workspaceId),
       ),
     );
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "email.template.delete",
+    targetType: "template",
+    targetId: id,
+  });
   revalidatePath("/email");
   redirect("/email");
 }
@@ -115,6 +139,18 @@ export async function createCampaign(formData: FormData) {
       status: "draft",
     })
     .returning({ id: campaigns.id });
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "email.campaign.create",
+    targetType: "campaign",
+    targetId: row.id,
+    meta: {
+      name: parsed.name,
+      templateId: parsed.templateId,
+      listId: parsed.listId,
+    },
+  });
   revalidatePath("/email");
   redirect(`/email/campaigns/${row.id}`);
 }
@@ -242,6 +278,15 @@ export async function sendCampaign(campaignId: string) {
     .update(campaigns)
     .set({ status: "completed", updatedAt: new Date() })
     .where(eq(campaigns.id, campaign.id));
+
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "email.campaign.send",
+    targetType: "campaign",
+    targetId: campaign.id,
+    meta: { name: campaign.name, sent, skipped, failed },
+  });
 
   revalidatePath(`/email/campaigns/${campaign.id}`);
   revalidatePath("/email");

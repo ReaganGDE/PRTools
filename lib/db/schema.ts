@@ -422,6 +422,30 @@ export const socialPosts = pgTable("social_posts", {
   createdAt: createdAt(),
 });
 
+/* ────────────────────── Audit log ────────────────────── */
+
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    action: text("action").notNull(),
+    targetType: text("target_type"),
+    targetId: text("target_id"),
+    meta: jsonb("meta").$type<Record<string, unknown>>(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("audit_workspace_created_idx").on(t.workspaceId, t.createdAt),
+    index("audit_user_idx").on(t.userId),
+  ],
+);
+
 /* ─────────────── Suppression (unsubscribes) ─────────────── */
 
 export const emailSuppressions = pgTable(
@@ -531,3 +555,4 @@ export type Campaign = typeof campaigns.$inferSelect;
 export type Send = typeof sends.$inferSelect;
 export type Mention = typeof mentions.$inferSelect;
 export type SocialPost = typeof socialPosts.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { workspaces, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { PageHeader } from "@/components/page-header";
+import { can, type Role } from "@/lib/permissions";
 import {
   Card,
   CardContent,
@@ -19,6 +20,7 @@ function isSet(name: string) {
 export default async function SettingsPage() {
   const session = await auth();
   const wsId = session!.user.workspaceId!;
+  const role = session!.user.role as Role | undefined;
   const [ws] = await db.select().from(workspaces).where(eq(workspaces.id, wsId));
   const members = await db
     .select({ email: users.email, name: users.name, role: users.role })
@@ -69,6 +71,22 @@ export default async function SettingsPage() {
             </ul>
           </CardContent>
         </Card>
+
+        {can(role, "audit.view") ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Audit log</CardTitle>
+              <CardDescription>
+                <Link href="/settings/audit" className="hover:underline">
+                  View workspace activity →
+                </Link>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-zinc-500">
+              Track who changed what, sends, role changes, and more.
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card className="lg:col-span-2">
           <CardHeader>

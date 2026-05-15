@@ -39,6 +39,14 @@ export const CAPABILITIES = {
   "social.post.publish": ["owner", "admin"],
   "social.account.connect": ["owner", "admin"],
 
+  // Audit
+  "audit.view": ["owner", "admin"],
+
+  // Exports
+  "export.contacts": ["owner", "admin", "member"],
+  "export.sends": ["owner", "admin", "member"],
+  "export.mentions": ["owner", "admin", "member", "viewer"],
+
   // Team & workspace
   "team.invite": ["owner", "admin"],
   "team.role.change": ["owner"], // only owner can change roles

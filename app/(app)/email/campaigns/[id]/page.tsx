@@ -110,11 +110,18 @@ export default async function CampaignDetailPage({
         title={campaign.name}
         description={`Status: ${campaign.status}`}
         actions={
-          canSend ? (
-            <form action={boundSend}>
-              <Button type="submit">Send to {memberCount} contacts</Button>
-            </form>
-          ) : null
+          <>
+            <Button asChild variant="outline">
+              <Link href={`/api/export/sends?campaignId=${campaign.id}`}>
+                Export sends
+              </Link>
+            </Button>
+            {canSend ? (
+              <form action={boundSend}>
+                <Button type="submit">Send to {memberCount} contacts</Button>
+              </form>
+            ) : null}
+          </>
         }
       />
       <div className="grid gap-6 p-8 lg:grid-cols-3">

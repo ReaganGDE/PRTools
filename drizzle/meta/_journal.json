@@ -15,6 +15,13 @@
       "when": 1778781181766,
       "tag": "0001_curious_justin_hammer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778854214694,
+      "tag": "0002_friendly_dazzler",
+      "breakpoints": true
     }
   ]
 }

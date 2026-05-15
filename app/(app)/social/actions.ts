@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { socialPosts } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
 import { submitRedditPost } from "@/lib/platforms/reddit";
+import { logAudit } from "@/lib/audit";
 
 const PLATFORM = z.enum(["reddit", "youtube", "facebook", "instagram"]);
 
@@ -69,6 +70,20 @@ export async function createPost(formData: FormData) {
       createdBy: session.userId,
     })
     .returning({ id: socialPosts.id });
+
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action:
+      action === "publish" ? "social.post.publish" : "social.post.create",
+    targetType: "social_post",
+    targetId: row.id,
+    meta: {
+      platform: parsed.platform,
+      status,
+      scheduledAt: scheduledAt?.toISOString() ?? null,
+    },
+  });
 
   // If publishing now, run inline
   if (action === "publish") {
@@ -140,6 +155,13 @@ export async function deletePost(postId: string) {
         eq(socialPosts.workspaceId, session.workspaceId),
       ),
     );
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "social.post.delete",
+    targetType: "social_post",
+    targetId: postId,
+  });
   revalidatePath("/social");
 }
 

@@ -106,9 +106,14 @@ export default async function SentimentPage({
         title="Sentiment"
         description={`Last 30 days · ${activeKeywords.length} keywords tracked`}
         actions={
-          <Button asChild variant="outline">
-            <Link href="/settings/keywords">Manage keywords</Link>
-          </Button>
+          <>
+            <Button asChild variant="outline">
+              <Link href="/api/export/mentions?days=30">Export CSV</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/settings/keywords">Manage keywords</Link>
+            </Button>
+          </>
         }
       />
       <div className="grid gap-6 p-8 lg:grid-cols-4">

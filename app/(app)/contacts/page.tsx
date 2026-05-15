@@ -94,6 +94,21 @@ export default async function ContactsPage({
               <Link href="/contacts/lists">Lists</Link>
             </Button>
             <Button asChild variant="outline">
+              <Link
+                href={`/api/export/contacts${
+                  q || type || tag || listId
+                    ? `?${new URLSearchParams(
+                        Object.entries({ q, type, tag, list: listId }).filter(
+                          ([, v]) => !!v,
+                        ) as [string, string][],
+                      ).toString()}`
+                    : ""
+                }`}
+              >
+                Export CSV
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href="/contacts/import">Import CSV</Link>
             </Button>
             <Button asChild>
