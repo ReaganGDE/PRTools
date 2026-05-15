@@ -6,65 +6,129 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { socialPosts } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
-import { submitRedditPost } from "@/lib/platforms/reddit";
+import {
+  scheduleImagePost,
+  scheduleVideoPost,
+  getUploadUrl,
+} from "@/lib/platforms/oneup";
 import { logAudit } from "@/lib/audit";
 
-const PLATFORM = z.enum(["reddit", "youtube", "facebook", "instagram"]);
+const SocialAccount = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  type: z.string(),
+});
 
 const PostInput = z.object({
-  platform: PLATFORM,
-  body: z.string().min(1),
-  // Reddit-specific
-  subreddit: z.string().optional(),
+  categoryId: z.string().min(1),
+  accounts: z.array(SocialAccount).min(1),
+  mediaKind: z.enum(["image", "video"]),
+  mediaUrls: z.array(z.string().url()).min(1),
+  thumbnailUrl: z.string().url().optional().or(z.literal("").transform(() => undefined)),
   title: z.string().optional(),
-  linkUrl: z.string().url().optional().or(z.literal("").transform(() => undefined)),
+  body: z.string().min(1),
+  subreddit: z.string().optional(),
   scheduledAt: z
     .string()
     .optional()
     .transform((v) => (v ? new Date(v) : null)),
 });
 
+function dominantPlatform(
+  accounts: { type: string }[],
+):
+  | "instagram"
+  | "tiktok"
+  | "reddit"
+  | "youtube"
+  | "facebook"
+  | "x"
+  | "linkedin"
+  | "pinterest"
+  | "gbp"
+  | "threads"
+  | "snapchat"
+  | "bluesky"
+  | "multi" {
+  const types = new Set(accounts.map((a) => normalizeType(a.type)));
+  if (types.size > 1) return "multi";
+  const t = [...types][0];
+  return t;
+}
+
+function normalizeType(
+  t: string,
+):
+  | "instagram"
+  | "tiktok"
+  | "reddit"
+  | "youtube"
+  | "facebook"
+  | "x"
+  | "linkedin"
+  | "pinterest"
+  | "gbp"
+  | "threads"
+  | "snapchat"
+  | "bluesky" {
+  const k = t.toLowerCase();
+  if (k.includes("instagram")) return "instagram";
+  if (k.includes("tiktok")) return "tiktok";
+  if (k.includes("reddit")) return "reddit";
+  if (k.includes("youtube")) return "youtube";
+  if (k.includes("facebook")) return "facebook";
+  if (k === "x" || k.includes("twitter")) return "x";
+  if (k.includes("linkedin")) return "linkedin";
+  if (k.includes("pinterest")) return "pinterest";
+  if (k.includes("gbp") || k.includes("google")) return "gbp";
+  if (k.includes("threads")) return "threads";
+  if (k.includes("snapchat")) return "snapchat";
+  if (k.includes("bluesky")) return "bluesky";
+  return "multi" as never;
+}
+
 export async function createPost(formData: FormData) {
   const session = await requireSessionWithCap("social.post.create");
+
+  const accountsRaw = formData.get("accounts");
+  const mediaUrlsRaw = formData.get("mediaUrls");
   const parsed = PostInput.parse({
-    platform: formData.get("platform"),
+    categoryId: formData.get("categoryId"),
+    accounts: accountsRaw ? JSON.parse(String(accountsRaw)) : [],
+    mediaKind: formData.get("mediaKind"),
+    mediaUrls: mediaUrlsRaw ? JSON.parse(String(mediaUrlsRaw)) : [],
+    thumbnailUrl: formData.get("thumbnailUrl") ?? undefined,
+    title: formData.get("title") ?? undefined,
     body: formData.get("body"),
     subreddit: formData.get("subreddit") ?? undefined,
-    title: formData.get("title") ?? undefined,
-    linkUrl: formData.get("linkUrl") ?? undefined,
     scheduledAt: formData.get("scheduledAt") ?? undefined,
   });
 
-  // For Reddit, encode subreddit + title into post body metadata
-  const fullBody =
-    parsed.platform === "reddit"
-      ? JSON.stringify({
-          subreddit: parsed.subreddit ?? "",
-          title: parsed.title ?? "",
-          body: parsed.body,
-          linkUrl: parsed.linkUrl ?? null,
-        })
-      : parsed.body;
-
   const action = formData.get("action") as string | null;
-  // "publish" → publish immediately, "schedule" → save for cron, else draft
   const status =
     action === "publish"
-      ? ("scheduled" as const) // mark scheduled now, executor will pick it up
+      ? ("scheduled" as const)
       : action === "schedule" && parsed.scheduledAt
         ? ("scheduled" as const)
         : ("draft" as const);
-
   const scheduledAt =
     action === "publish" ? new Date() : parsed.scheduledAt ?? null;
+
+  const platform = dominantPlatform(parsed.accounts);
 
   const [row] = await db
     .insert(socialPosts)
     .values({
       workspaceId: session.workspaceId,
-      platform: parsed.platform,
-      body: fullBody,
-      mediaUrls: [],
+      platform,
+      body: parsed.body,
+      title: parsed.title ?? null,
+      mediaUrls: parsed.mediaUrls,
+      mediaKind: parsed.mediaKind,
+      thumbnailUrl: parsed.thumbnailUrl ?? null,
+      subreddit: parsed.subreddit ?? null,
+      oneupCategoryId: parsed.categoryId,
+      oneupSocialNetworkIds: parsed.accounts,
       status,
       scheduledAt,
       createdBy: session.userId,
@@ -79,13 +143,14 @@ export async function createPost(formData: FormData) {
     targetType: "social_post",
     targetId: row.id,
     meta: {
-      platform: parsed.platform,
+      platform,
+      accounts: parsed.accounts.length,
+      mediaKind: parsed.mediaKind,
       status,
       scheduledAt: scheduledAt?.toISOString() ?? null,
     },
   });
 
-  // If publishing now, run inline
   if (action === "publish") {
     await runPost(row.id);
   }
@@ -103,36 +168,42 @@ export async function runPost(postId: string): Promise<void> {
   if (post.status === "posted") return;
 
   try {
-    if (post.platform === "reddit") {
-      const meta = JSON.parse(post.body) as {
-        subreddit: string;
-        title: string;
-        body: string;
-        linkUrl: string | null;
-      };
-      if (!meta.subreddit || !meta.title) {
-        throw new Error("Reddit post missing subreddit or title");
-      }
-      const result = await submitRedditPost({
-        subreddit: meta.subreddit,
-        title: meta.title,
-        body: meta.body,
-        url: meta.linkUrl ?? undefined,
-      });
-      await db
-        .update(socialPosts)
-        .set({
-          status: "posted",
-          postedAt: new Date(),
-          externalId: result.id,
-          externalUrl: result.url,
-        })
-        .where(eq(socialPosts.id, post.id));
-    } else {
-      throw new Error(
-        `Posting to ${post.platform} is not yet implemented (needs OAuth).`,
-      );
+    if (!post.oneupCategoryId || !post.oneupSocialNetworkIds) {
+      throw new Error("Post is missing OneUp routing data");
     }
+    if (!post.mediaUrls || post.mediaUrls.length === 0) {
+      throw new Error("Post has no media attached");
+    }
+    const ids = post.oneupSocialNetworkIds.map((a) => a.id);
+    const common = {
+      categoryId: post.oneupCategoryId,
+      socialNetworkIds: ids,
+      scheduledAt: post.scheduledAt ?? new Date(),
+      content: post.body,
+      title: post.title ?? undefined,
+      subreddit: post.subreddit ?? undefined,
+    };
+
+    if (post.mediaKind === "video") {
+      await scheduleVideoPost({
+        ...common,
+        videoUrl: post.mediaUrls[0],
+        thumbnailUrl: post.thumbnailUrl ?? undefined,
+      });
+    } else {
+      await scheduleImagePost({
+        ...common,
+        imageUrls: post.mediaUrls,
+      });
+    }
+
+    await db
+      .update(socialPosts)
+      .set({
+        status: "posted",
+        postedAt: new Date(),
+      })
+      .where(eq(socialPosts.id, post.id));
   } catch (e) {
     await db
       .update(socialPosts)
@@ -195,4 +266,28 @@ export async function runDuePostsForAllWorkspaces(): Promise<{
     }
   }
   return { attempted: due.length, posted, failed };
+}
+
+// Used by /social/new — server action to fetch a pre-signed upload URL.
+// The client PUTs the file directly to S3, then submits the form with file_path.
+export async function getOneUpUploadUrl(): Promise<{
+  upload_url: string;
+  file_path: string;
+}> {
+  await requireSessionWithCap("social.post.create");
+  return getUploadUrl();
+}
+
+// Used by /social/new — list OneUp categories for picker.
+export async function listOneUpCategories() {
+  await requireSessionWithCap("social.post.create");
+  const { listCategories } = await import("@/lib/platforms/oneup");
+  return listCategories();
+}
+
+// Used by /social/new — list accounts for a chosen category.
+export async function listOneUpCategoryAccounts(categoryId: string) {
+  await requireSessionWithCap("social.post.create");
+  const { listCategoryAccounts } = await import("@/lib/platforms/oneup");
+  return listCategoryAccounts(categoryId);
 }

@@ -32,6 +32,14 @@ export const platformEnum = pgEnum("platform", [
   "youtube",
   "facebook",
   "email",
+  "x",
+  "linkedin",
+  "pinterest",
+  "gbp",
+  "threads",
+  "snapchat",
+  "bluesky",
+  "multi",
 ]);
 
 export const contactTypeEnum = pgEnum("contact_type", [
@@ -412,7 +420,16 @@ export const socialPosts = pgTable("social_posts", {
   platform: platformEnum("platform").notNull(),
   status: socialPostStatusEnum("status").default("draft").notNull(),
   body: text("body").notNull(),
+  title: text("title"),
   mediaUrls: text("media_urls").array().default([]).notNull(),
+  mediaKind: text("media_kind"),
+  thumbnailUrl: text("thumbnail_url"),
+  subreddit: text("subreddit"),
+  oneupCategoryId: text("oneup_category_id"),
+  oneupSocialNetworkIds:
+    jsonb("oneup_social_network_ids").$type<
+      { id: string; name: string; type: string }[]
+    >(),
   scheduledAt: timestamp("scheduled_at"),
   postedAt: timestamp("posted_at"),
   externalId: text("external_id"),

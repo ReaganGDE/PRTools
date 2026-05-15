@@ -6,12 +6,6 @@ import { requireSession } from "@/lib/auth-helpers";
 import { can } from "@/lib/permissions";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { deletePost } from "./actions";
 
 export default async function SocialPage() {
@@ -29,7 +23,7 @@ export default async function SocialPage() {
     <>
       <PageHeader
         title="Social"
-        description="Post to Reddit (now), YouTube/Facebook/Instagram (OAuth required, coming)."
+        description="Schedule image and video posts to any platform connected in OneUp."
         actions={
           canCreate ? (
             <Button asChild>
@@ -39,27 +33,6 @@ export default async function SocialPage() {
         }
       />
       <div className="p-8">
-        <Card className="mb-6 border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30">
-          <CardHeader>
-            <CardTitle className="text-base">Current support</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <ul className="ml-4 list-disc space-y-1 text-zinc-700 dark:text-zinc-300">
-              <li>
-                <strong>Reddit:</strong> fully working. Add{" "}
-                <code>REDDIT_USERNAME</code> + <code>REDDIT_PASSWORD</code>{" "}
-                env vars (plus the existing Reddit OAuth credentials) to your
-                Vercel project.
-              </li>
-              <li>
-                <strong>YouTube, Facebook Page, Instagram:</strong> stubbed —
-                will throw &quot;not implemented&quot;. Each needs per-account
-                OAuth which is a future phase (Meta App Review required for
-                IG).
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
 
         {rows.length === 0 ? (
           <div className="rounded-lg border border-dashed border-zinc-300 p-12 text-center dark:border-zinc-700">
@@ -84,26 +57,20 @@ function PostRow({
   post: typeof socialPosts.$inferSelect;
   canEdit: boolean;
 }) {
-  const isReddit = post.platform === "reddit";
-  let title = "";
-  let body = post.body;
-  if (isReddit) {
-    try {
-      const meta = JSON.parse(post.body) as { title?: string; body?: string };
-      title = meta.title ?? "";
-      body = meta.body ?? "";
-    } catch {
-      /* keep raw body */
-    }
-  }
+  const accounts = post.oneupSocialNetworkIds ?? [];
   return (
     <li className="rounded-md border border-zinc-200 bg-white p-4 text-sm dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center gap-2">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs capitalize dark:bg-zinc-800">
               {post.platform}
             </span>
+            {post.mediaKind ? (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800">
+                {post.mediaKind}
+              </span>
+            ) : null}
             <StatusBadge status={post.status} />
             {post.scheduledAt ? (
               <span className="text-xs text-zinc-500">
@@ -112,9 +79,14 @@ function PostRow({
               </span>
             ) : null}
           </div>
-          {title ? <div className="font-medium">{title}</div> : null}
+          {accounts.length > 0 ? (
+            <div className="mb-1 text-xs text-zinc-500">
+              → {accounts.map((a) => `${a.type}: ${a.name}`).join(", ")}
+            </div>
+          ) : null}
+          {post.title ? <div className="font-medium">{post.title}</div> : null}
           <p className="line-clamp-3 whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
-            {body}
+            {post.body}
           </p>
           {post.externalUrl ? (
             <a
