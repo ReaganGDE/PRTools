@@ -40,7 +40,7 @@ export function NewPostForm() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     listOneUpCategories()
@@ -82,8 +82,25 @@ export function NewPostForm() {
     }
   }
 
+  const busy = uploading || isPending;
+
+  function localNow(): string {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    fd.set("clientNow", localNow());
+    startTransition(async () => {
+      await createPost(fd);
+    });
+  }
+
   return (
-    <form action={createPost} className="grid max-w-2xl gap-4">
+    <form onSubmit={handleSubmit} className="grid max-w-2xl gap-4">
       <input type="hidden" name="categoryId" value={categoryId} />
       <input
         type="hidden"
@@ -317,14 +334,9 @@ export function NewPostForm() {
             type="submit"
             name="action"
             value="schedule"
-            disabled={
-              uploading ||
-              mediaUrls.length === 0 ||
-              selectedIds.length === 0 ||
-              !categoryId
-            }
+            disabled={busy || mediaUrls.length === 0 || selectedIds.length === 0 || !categoryId}
           >
-            Schedule
+            {isPending ? "Scheduling…" : "Schedule"}
           </Button>
         ) : (
           <>
@@ -332,27 +344,25 @@ export function NewPostForm() {
               type="submit"
               name="action"
               value="publish"
-              disabled={
-                uploading ||
-                mediaUrls.length === 0 ||
-                selectedIds.length === 0 ||
-                !categoryId
-              }
+              disabled={busy || mediaUrls.length === 0 || selectedIds.length === 0 || !categoryId}
             >
-              Post now
+              {isPending ? "Posting…" : "Post now"}
             </Button>
             <Button
               type="submit"
               name="action"
               value="draft"
               variant="outline"
-              disabled={uploading || !categoryId}
+              disabled={busy || !categoryId}
             >
-              Save as draft
+              {isPending ? "Saving…" : "Save as draft"}
             </Button>
           </>
         )}
       </div>
+      {isPending ? (
+        <p className="text-xs text-zinc-500">Sending to OneUp, please wait…</p>
+      ) : null}
     </form>
   );
 }

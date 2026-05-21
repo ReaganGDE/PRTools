@@ -84,11 +84,18 @@ function normalizeType(
   return "multi" as never;
 }
 
+// "YYYY-MM-DDTHH:MM" (from datetime-local) → "YYYY-MM-DD HH:MM" for OneUp
+function toOneUpDateTime(localStr: string): string {
+  return localStr.replace("T", " ");
+}
+
 export async function createPost(formData: FormData) {
   const session = await requireSessionWithCap("social.post.create");
 
   const accountsRaw = formData.get("accounts");
   const mediaUrlsRaw = formData.get("mediaUrls");
+  // clientNow is the user's local datetime at submit time, sent by the form
+  const clientNow = formData.get("clientNow") as string | null;
   const parsed = PostInput.parse({
     categoryId: formData.get("categoryId"),
     accounts: accountsRaw ? JSON.parse(String(accountsRaw)) : [],
@@ -102,16 +109,47 @@ export async function createPost(formData: FormData) {
   });
 
   const action = formData.get("action") as string | null;
-  const status =
+  const status: "scheduled" | "posted" | "draft" =
     action === "publish"
-      ? ("scheduled" as const)
+      ? "posted"
       : action === "schedule" && parsed.scheduledAt
-        ? ("scheduled" as const)
-        : ("draft" as const);
+        ? "scheduled"
+        : "draft";
   const scheduledAt =
     action === "publish" ? new Date() : parsed.scheduledAt ?? null;
 
   const platform = dominantPlatform(parsed.accounts);
+  const ids = parsed.accounts.map((a) => a.id);
+
+  // For "post now": call OneUp immediately with the user's local time so
+  // it schedules for right now rather than offset into the future.
+  let postError: string | null = null;
+  if (action === "publish") {
+    const oneupTime = clientNow
+      ? toOneUpDateTime(clientNow)
+      : toOneUpDateTime(new Date().toISOString().slice(0, 16));
+    const common = {
+      categoryId: parsed.categoryId,
+      socialNetworkIds: ids,
+      scheduledAt: oneupTime,
+      content: parsed.body,
+      title: parsed.title,
+      subreddit: parsed.subreddit,
+    };
+    try {
+      if (parsed.mediaKind === "video") {
+        await scheduleVideoPost({
+          ...common,
+          videoUrl: parsed.mediaUrls[0],
+          thumbnailUrl: parsed.thumbnailUrl,
+        });
+      } else {
+        await scheduleImagePost({ ...common, imageUrls: parsed.mediaUrls });
+      }
+    } catch (e) {
+      postError = (e as Error).message;
+    }
+  }
 
   const [row] = await db
     .insert(socialPosts)
@@ -126,7 +164,9 @@ export async function createPost(formData: FormData) {
       subreddit: parsed.subreddit ?? null,
       oneupCategoryId: parsed.categoryId,
       oneupSocialNetworkIds: parsed.accounts,
-      status,
+      status: postError ? "failed" : status,
+      error: postError,
+      postedAt: action === "publish" && !postError ? new Date() : null,
       scheduledAt,
       createdBy: session.userId,
     })
@@ -148,10 +188,6 @@ export async function createPost(formData: FormData) {
     },
   });
 
-  if (action === "publish") {
-    await runPost(row.id);
-  }
-
   revalidatePath("/social");
   redirect("/social");
 }
@@ -172,10 +208,13 @@ export async function runPost(postId: string): Promise<void> {
       throw new Error("Post has no media attached");
     }
     const ids = post.oneupSocialNetworkIds.map((a) => a.id);
+    // Cron fires when the post is due — pass current time so OneUp processes it now.
+    const now = new Date();
+    const nowStr = toOneUpDateTime(now.toISOString().slice(0, 16));
     const common = {
       categoryId: post.oneupCategoryId,
       socialNetworkIds: ids,
-      scheduledAt: post.scheduledAt ?? new Date(),
+      scheduledAt: nowStr,
       content: post.body,
       title: post.title ?? undefined,
       subreddit: post.subreddit ?? undefined,

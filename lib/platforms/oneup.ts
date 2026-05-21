@@ -93,16 +93,11 @@ export async function getUploadUrl(): Promise<{
   return (await res.json()) as { upload_url: string; file_path: string };
 }
 
-function fmtDate(d: Date): string {
-  // OneUp expects: YYYY-MM-DD HH:MM
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 type CommonPostArgs = {
   categoryId: string;
   socialNetworkIds: string[];
-  scheduledAt: Date;
+  scheduledAt: string; // "YYYY-MM-DD HH:MM" in the user's OneUp account timezone
   content: string;
   title?: string;
   subreddit?: string;
@@ -113,7 +108,7 @@ function commonFields(args: CommonPostArgs): Record<string, string> {
   const fields: Record<string, string> = {
     category_id: args.categoryId,
     social_network_id: JSON.stringify(args.socialNetworkIds),
-    scheduled_date_time: fmtDate(args.scheduledAt),
+    scheduled_date_time: args.scheduledAt,
     content: args.content,
   };
   if (args.title) fields.title = args.title;
