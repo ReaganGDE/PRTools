@@ -156,7 +156,7 @@ function PostRow({
   const accounts = post.oneupSocialNetworkIds ?? [];
   return (
     <li
-      className="group rounded-lg border border-zinc-200 bg-white text-sm shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950"
+      className="group rounded-xl border border-zinc-200/80 bg-white text-sm shadow-sm transition-all duration-150 hover:shadow-md dark:border-zinc-800/60 dark:bg-zinc-900"
       style={
         brandColor
           ? { borderLeftWidth: 3, borderLeftColor: brandColor }

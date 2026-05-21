@@ -26,7 +26,7 @@ export default async function AppLayout({
   ]);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar
         user={{ email: session.user.email, name: session.user.name }}
         brands={brands.map((b) => ({
@@ -37,7 +37,9 @@ export default async function AppLayout({
         }))}
         activeBrandId={activeBrandId}
       />
-      <main className="flex-1 overflow-x-auto">{children}</main>
+      <main className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950">
+        {children}
+      </main>
     </div>
   );
 }

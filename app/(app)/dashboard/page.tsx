@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Calendar,
   CheckCircle2,
+  ChevronRight,
   Clock,
   MessageSquare,
   Users,
@@ -108,7 +109,7 @@ export default async function DashboardPage() {
     <>
       <PageHeader
         title={`Good to see you, ${displayName}`}
-        description="Here&apos;s what&apos;s happening across your workspace."
+        description="Here's what's happening across your workspace."
       />
       <div className="space-y-6 p-8">
         {/* Alerts */}
@@ -211,27 +212,32 @@ function AlertBanner({
   description: string;
   href: string;
 }) {
-  const border = {
-    red: "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/30",
-    amber: "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30",
-  }[color];
-  const iconCls = {
-    red: "text-red-600 dark:text-red-400",
-    amber: "text-amber-600 dark:text-amber-400",
+  const styles = {
+    red: {
+      wrap: "border-red-200/80 bg-red-50 hover:bg-red-100/60 dark:border-red-900/30 dark:bg-red-950/20",
+      icon: "bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400",
+    },
+    amber: {
+      wrap: "border-amber-200/80 bg-amber-50 hover:bg-amber-100/60 dark:border-amber-900/30 dark:bg-amber-950/20",
+      icon: "bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400",
+    },
   }[color];
   return (
     <Link
       href={href}
       className={cn(
-        "flex items-start gap-3 rounded-lg border p-4 transition-opacity hover:opacity-80",
-        border,
+        "flex items-start gap-3 rounded-xl border p-4 transition-all duration-150",
+        styles.wrap,
       )}
     >
-      <span className={cn("mt-0.5 shrink-0", iconCls)}>{icon}</span>
+      <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", styles.icon)}>
+        {icon}
+      </span>
       <div>
         <p className="text-sm font-semibold">{title}</p>
-        <p className="text-xs text-zinc-600 dark:text-zinc-400">{description}</p>
+        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{description}</p>
       </div>
+      <ChevronRight className="ml-auto mt-1 h-4 w-4 shrink-0 text-zinc-400" />
     </Link>
   );
 }
@@ -247,7 +253,7 @@ function SectionHeading({
 }) {
   return (
     <div className="mb-3 flex items-center justify-between">
-      <div className="flex items-center gap-1.5 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+      <div className="flex items-center gap-1.5 text-[13px] font-semibold text-zinc-700 dark:text-zinc-300">
         {icon}
         {label}
       </div>
@@ -283,21 +289,16 @@ function UpcomingPostRow({
     <li>
       <Link
         href={`/social/${post.id}`}
-        className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white p-3 text-sm transition-shadow hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+        className="group flex items-center gap-3 rounded-xl border border-zinc-200/80 bg-white p-3 text-sm shadow-sm transition-all duration-150 hover:shadow-md dark:border-zinc-800/60 dark:bg-zinc-900"
       >
-        <span
-          className={cn(
-            "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium capitalize",
-            colorCls,
-          )}
-        >
+        <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize", colorCls)}>
           {post.platform}
         </span>
         <span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-300">
           {post.title || post.body}
         </span>
         {post.scheduledAt && (
-          <span className="shrink-0 text-[11px] text-zinc-400">
+          <span className="shrink-0 text-[11px] tabular-nums text-zinc-400">
             {post.scheduledAt.toLocaleDateString(undefined, {
               weekday: "short",
               month: "short",
@@ -307,6 +308,7 @@ function UpcomingPostRow({
             })}
           </span>
         )}
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-300 opacity-0 transition-opacity group-hover:opacity-100" />
       </Link>
     </li>
   );
@@ -314,9 +316,10 @@ function UpcomingPostRow({
 
 function EmptyQueue() {
   return (
-    <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-6 text-center dark:border-zinc-700 dark:bg-zinc-900/20">
-      <p className="text-sm text-zinc-500">Nothing scheduled this week.</p>
-      <Button asChild size="sm" className="mt-3">
+    <div className="rounded-xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
+      <p className="text-sm font-medium text-zinc-500">Nothing scheduled this week</p>
+      <p className="mt-0.5 text-xs text-zinc-400">Posts you schedule will appear here.</p>
+      <Button asChild size="sm" className="mt-4">
         <Link href="/social/new">Create a post</Link>
       </Button>
     </div>
@@ -337,19 +340,19 @@ function StatCard({
   href?: string;
 }) {
   const inner = (
-    <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-50 dark:bg-zinc-900">
+    <div className="flex items-center gap-3 rounded-xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-50 dark:bg-zinc-800">
         {icon}
       </div>
       <div>
-        <p className="text-2xl font-semibold tabular-nums">{value}</p>
-        <p className="text-xs text-zinc-500">{label}</p>
+        <p className="text-2xl font-bold tabular-nums tracking-tight">{value}</p>
+        <p className="text-xs font-medium text-zinc-500">{label}</p>
         {sub && <p className="text-[10px] text-zinc-400">{sub}</p>}
       </div>
     </div>
   );
   return href ? (
-    <Link href={href} className="block transition-opacity hover:opacity-80">
+    <Link href={href} className="block transition-all duration-150 hover:scale-[1.01]">
       {inner}
     </Link>
   ) : (

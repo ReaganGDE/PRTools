@@ -230,7 +230,7 @@ export function NewPostForm({
                       const m = movies.find((x) => x.id === next);
                       if (m?.brandId) setBrandId(m.brandId);
                     }}
-                    className="rounded-md border border-zinc-200 bg-white p-2 text-sm transition-colors focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400/30 dark:border-zinc-800 dark:bg-zinc-950"
+                    className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm shadow-sm transition-all focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 dark:border-zinc-700 dark:bg-zinc-900"
                   >
                     <option value="">— None —</option>
                     {movies
@@ -257,7 +257,7 @@ export function NewPostForm({
                 required
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="rounded-md border border-zinc-200 bg-white p-2 text-sm transition-colors focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400/30 dark:border-zinc-800 dark:bg-zinc-950"
+                className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm shadow-sm transition-all focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 dark:border-zinc-700 dark:bg-zinc-900"
               >
                 <option value="">
                   {categories ? "Pick a category…" : "Loading…"}
@@ -512,7 +512,7 @@ export function NewPostForm({
                 rows={6}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                className="rounded-md border border-zinc-200 bg-white p-3 text-sm transition-colors focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400/30 dark:border-zinc-800 dark:bg-zinc-950"
+                className="rounded-lg border border-zinc-200 bg-white p-3 text-sm shadow-sm transition-all focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 dark:border-zinc-700 dark:bg-zinc-900"
                 placeholder="What do you want to say?"
               />
             </div>
@@ -619,8 +619,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+    <div className="rounded-xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900">
+      <div className="mb-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
         {title}
       </div>
       {children}

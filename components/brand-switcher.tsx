@@ -25,9 +25,7 @@ export function BrandSwitcher({
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
@@ -37,81 +35,89 @@ export function BrandSwitcher({
 
   function pick(id: string | null) {
     setOpen(false);
-    startTransition(async () => {
-      await setActiveBrand(id);
-    });
+    startTransition(async () => { await setActiveBrand(id); });
   }
 
   return (
-    <div ref={ref} className="relative px-3 py-2">
+    <div ref={ref} className="relative px-2 pb-3">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={isPending}
-        className={cn(
-          "flex w-full items-center gap-2 rounded-md border border-zinc-200 bg-white px-2.5 py-2 text-left text-sm transition-colors hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800",
-        )}
+        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-all duration-100 hover:bg-white/5 disabled:opacity-50"
+        style={{ color: "var(--sidebar-fg)", border: "1px solid var(--sidebar-border)" }}
       >
         {active ? (
-          <span
-            className="h-3 w-3 shrink-0 rounded-sm"
-            style={{ backgroundColor: active.color }}
-          />
+          <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: active.color }} />
         ) : (
-          <Layers className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+          <Layers className="h-3 w-3 shrink-0 text-zinc-600" />
         )}
-        <span className="min-w-0 flex-1 truncate font-medium">
+        <span className="min-w-0 flex-1 truncate text-zinc-400">
           {active ? active.name : "All brands"}
         </span>
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+        <ChevronDown className={cn("h-3 w-3 shrink-0 text-zinc-600 transition-transform", open && "rotate-180")} />
       </button>
 
       {open && (
-        <div className="absolute left-3 right-3 top-full z-30 mt-1 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
-          <button
-            type="button"
+        <div
+          className="absolute left-2 right-2 top-full z-50 mt-1 overflow-hidden rounded-lg shadow-xl"
+          style={{ background: "#18181d", border: "1px solid rgba(255,255,255,0.08)" }}
+        >
+          <DropItem
+            icon={<Layers className="h-3.5 w-3.5 text-zinc-500" />}
+            label="All brands"
+            active={!active}
             onClick={() => pick(null)}
-            className={cn(
-              "flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900",
-              !active && "bg-zinc-50 dark:bg-zinc-900",
-            )}
-          >
-            <Layers className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-            <span className="flex-1 text-left">All brands</span>
-            {!active && <Check className="h-3.5 w-3.5 text-red-600" />}
-          </button>
-          <div className="border-t border-zinc-100 dark:border-zinc-800/60" />
+          />
+          {brands.length > 0 && (
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }} />
+          )}
           {brands.map((b) => (
-            <button
+            <DropItem
               key={b.id}
-              type="button"
+              icon={<span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ backgroundColor: b.color }} />}
+              label={b.name}
+              active={active?.id === b.id}
               onClick={() => pick(b.id)}
-              className={cn(
-                "flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900",
-                active?.id === b.id && "bg-zinc-50 dark:bg-zinc-900",
-              )}
-            >
-              <span
-                className="h-3 w-3 shrink-0 rounded-sm"
-                style={{ backgroundColor: b.color }}
-              />
-              <span className="flex-1 truncate text-left">{b.name}</span>
-              {active?.id === b.id && (
-                <Check className="h-3.5 w-3.5 text-red-600" />
-              )}
-            </button>
+            />
           ))}
-          <div className="border-t border-zinc-100 dark:border-zinc-800/60" />
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }} />
           <Link
             href="/brands"
             onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-900"
+            className="flex items-center gap-2 px-3 py-2 text-[12px] text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-300"
           >
-            <Plus className="h-3.5 w-3.5 shrink-0" />
-            Manage brands
+            <Plus className="h-3.5 w-3.5" /> Manage brands
           </Link>
         </div>
       )}
     </div>
+  );
+}
+
+function DropItem({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-2 px-3 py-2 text-[12px] text-left transition-colors",
+        active ? "bg-white/5 text-white" : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200",
+      )}
+    >
+      {icon}
+      <span className="flex-1 truncate">{label}</span>
+      {active && <Check className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+    </button>
   );
 }
