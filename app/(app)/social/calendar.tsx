@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,8 @@ type CalPost = {
   status: string;
   scheduledAt: Date | null;
   postedAt: Date | null;
+  brandColor: string | null;
+  brandName: string | null;
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -145,9 +148,16 @@ export function PostCalendar({ posts }: { posts: CalPost[] }) {
                 const colorCls =
                   PLATFORM_COLORS[p.platform] ?? PLATFORM_COLORS.multi;
                 return (
-                  <div
+                  <Link
                     key={p.id}
-                    className="cursor-default rounded-md border border-zinc-200 bg-white p-1.5 text-xs shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
+                    href={`/social/${p.id}`}
+                    className="block rounded-md border border-zinc-200 bg-white p-1.5 text-xs shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
+                    style={
+                      p.brandColor
+                        ? { borderLeftWidth: 3, borderLeftColor: p.brandColor }
+                        : undefined
+                    }
+                    title={p.brandName ?? undefined}
                   >
                     <div className="mb-1 flex items-center justify-between gap-1">
                       <span
@@ -177,7 +187,7 @@ export function PostCalendar({ posts }: { posts: CalPost[] }) {
                         {p.status}
                       </div>
                     ) : null}
-                  </div>
+                  </Link>
                 );
               })}
             </div>

@@ -11,6 +11,7 @@ import {
   Mail,
   Home,
   LogOut,
+  Film,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandSwitcher, type BrandOption } from "@/components/brand-switcher";
@@ -38,6 +39,10 @@ const NAV_GROUPS: {
       { href: "/social", label: "Social", icon: Megaphone },
       { href: "/sentiment", label: "Sentiment", icon: BarChart3 },
     ],
+  },
+  {
+    label: "Catalog",
+    items: [{ href: "/movies", label: "Movies", icon: Film }],
   },
   {
     label: null,

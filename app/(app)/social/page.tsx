@@ -2,7 +2,7 @@ import Link from "next/link";
 import { eq, desc, and } from "drizzle-orm";
 import { Calendar, List, Plus } from "lucide-react";
 import { db } from "@/lib/db";
-import { socialPosts } from "@/lib/db/schema";
+import { socialPosts, brands } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { can } from "@/lib/permissions";
 import { getActiveBrandId } from "@/lib/brand-context";
@@ -31,20 +31,27 @@ export default async function SocialPage({
     : eq(socialPosts.workspaceId, session.workspaceId);
 
   const rows = await db
-    .select()
+    .select({
+      post: socialPosts,
+      brandName: brands.name,
+      brandColor: brands.color,
+    })
     .from(socialPosts)
+    .leftJoin(brands, eq(brands.id, socialPosts.brandId))
     .where(whereClause)
     .orderBy(desc(socialPosts.createdAt))
     .limit(100);
 
   const calendarPosts = rows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    body: r.body,
-    platform: r.platform,
-    status: r.status,
-    scheduledAt: r.scheduledAt,
-    postedAt: r.postedAt,
+    id: r.post.id,
+    title: r.post.title,
+    body: r.post.body,
+    platform: r.post.platform,
+    status: r.post.status,
+    scheduledAt: r.post.scheduledAt,
+    postedAt: r.post.postedAt,
+    brandColor: r.brandColor,
+    brandName: r.brandName,
   }));
 
   return (
@@ -72,8 +79,14 @@ export default async function SocialPage({
           <PostCalendar posts={calendarPosts} />
         ) : (
           <ul className="space-y-3">
-            {rows.map((p) => (
-              <PostRow key={p.id} post={p} canEdit={canCreate} />
+            {rows.map((r) => (
+              <PostRow
+                key={r.post.id}
+                post={r.post}
+                brandName={r.brandName}
+                brandColor={r.brandColor}
+                canEdit={canCreate}
+              />
             ))}
           </ul>
         )}
@@ -131,18 +144,41 @@ function EmptyState() {
 
 function PostRow({
   post,
+  brandName,
+  brandColor,
   canEdit,
 }: {
   post: typeof socialPosts.$inferSelect;
+  brandName: string | null;
+  brandColor: string | null;
   canEdit: boolean;
 }) {
   const accounts = post.oneupSocialNetworkIds ?? [];
   return (
-    <li className="group rounded-lg border border-zinc-200 bg-white text-sm shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950">
+    <li
+      className="group rounded-lg border border-zinc-200 bg-white text-sm shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950"
+      style={
+        brandColor
+          ? { borderLeftWidth: 3, borderLeftColor: brandColor }
+          : undefined
+      }
+    >
       <Link href={`/social/${post.id}`} className="block p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex flex-wrap items-center gap-2">
+              {brandName && brandColor && (
+                <span
+                  className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium dark:bg-zinc-800"
+                  title={brandName}
+                >
+                  <span
+                    className="h-2 w-2 rounded-sm"
+                    style={{ backgroundColor: brandColor }}
+                  />
+                  {brandName}
+                </span>
+              )}
               <PlatformPill platform={post.platform} />
               {post.mediaKind ? (
                 <span className="rounded-full border border-zinc-200 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">

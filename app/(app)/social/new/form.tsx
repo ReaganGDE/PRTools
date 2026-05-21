@@ -59,15 +59,19 @@ function hasReddit(types: string[]): boolean {
 type ScheduleMode = "publish" | "schedule" | "draft";
 
 type BrandOpt = { id: string; name: string; color: string };
+type MovieOpt = { id: string; title: string; brandId: string | null };
 
 export function NewPostForm({
   brands,
+  movies,
   defaultBrandId,
 }: {
   brands: BrandOpt[];
+  movies: MovieOpt[];
   defaultBrandId: string | null;
 }) {
   const [brandId, setBrandId] = useState<string>(defaultBrandId ?? "");
+  const [movieId, setMovieId] = useState<string>("");
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [categoryId, setCategoryId] = useState<string>("");
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -160,6 +164,7 @@ export function NewPostForm({
         <input type="hidden" name="thumbnailUrl" value={thumbnailUrl} />
         <input type="hidden" name="action" value={mode} />
         <input type="hidden" name="brandId" value={brandId} />
+        <input type="hidden" name="movieId" value={movieId} />
 
         {loadError ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
@@ -169,39 +174,75 @@ export function NewPostForm({
 
         {/* BRAND */}
         {brands.length > 0 && (
-          <Section title="Brand">
-            <div className="flex flex-wrap gap-2">
-              {brands.map((b) => (
+          <Section title="Brand & Campaign">
+            <div className="grid gap-3">
+              <div className="flex flex-wrap gap-2">
+                {brands.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => {
+                      setBrandId(b.id);
+                      // clear movie if it doesn't belong to this brand
+                      const m = movies.find((x) => x.id === movieId);
+                      if (m && m.brandId !== b.id) setMovieId("");
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+                      brandId === b.id
+                        ? "border-red-600 bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300"
+                        : "border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900",
+                    )}
+                  >
+                    <span
+                      className="h-3 w-3 rounded-sm"
+                      style={{ backgroundColor: b.color }}
+                    />
+                    {b.name}
+                  </button>
+                ))}
                 <button
-                  key={b.id}
                   type="button"
-                  onClick={() => setBrandId(b.id)}
+                  onClick={() => {
+                    setBrandId("");
+                    setMovieId("");
+                  }}
                   className={cn(
-                    "flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
-                    brandId === b.id
-                      ? "border-red-600 bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300"
-                      : "border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900",
+                    "rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+                    !brandId
+                      ? "border-zinc-400 bg-zinc-100 text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                      : "border-zinc-200 text-zinc-500 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900",
                   )}
                 >
-                  <span
-                    className="h-3 w-3 rounded-sm"
-                    style={{ backgroundColor: b.color }}
-                  />
-                  {b.name}
+                  No brand
                 </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setBrandId("")}
-                className={cn(
-                  "rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
-                  !brandId
-                    ? "border-zinc-400 bg-zinc-100 text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
-                    : "border-zinc-200 text-zinc-500 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900",
-                )}
-              >
-                No brand
-              </button>
+              </div>
+
+              {movies.length > 0 && (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="movieId">Movie campaign (optional)</Label>
+                  <select
+                    id="movieId"
+                    value={movieId}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setMovieId(next);
+                      const m = movies.find((x) => x.id === next);
+                      if (m?.brandId) setBrandId(m.brandId);
+                    }}
+                    className="rounded-md border border-zinc-200 bg-white p-2 text-sm transition-colors focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400/30 dark:border-zinc-800 dark:bg-zinc-950"
+                  >
+                    <option value="">— None —</option>
+                    {movies
+                      .filter((m) => !brandId || m.brandId === brandId)
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.title}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
             </div>
           </Section>
         )}

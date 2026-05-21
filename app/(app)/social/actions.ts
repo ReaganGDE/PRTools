@@ -154,12 +154,14 @@ export async function createPost(formData: FormData) {
 
   const formBrandId = (formData.get("brandId") as string | null) || null;
   const brandId = formBrandId || (await getActiveBrandId());
+  const movieId = (formData.get("movieId") as string | null) || null;
 
   const [row] = await db
     .insert(socialPosts)
     .values({
       workspaceId: session.workspaceId,
       brandId,
+      movieId,
       platform,
       body: parsed.body,
       title: parsed.title ?? null,
