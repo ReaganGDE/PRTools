@@ -1,11 +1,11 @@
 "use client";
 import { useEffect, useState, useTransition } from "react";
+import { upload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   createPost,
-  getOneUpUploadUrl,
   listOneUpCategories,
   listOneUpCategoryAccounts,
 } from "../actions";
@@ -67,15 +67,13 @@ export function NewPostForm() {
     setUploading(true);
     setUploadError(null);
     try {
-      const { upload_url, file_path } = await getOneUpUploadUrl();
-      const put = await fetch(upload_url, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+        contentType: file.type,
       });
-      if (!put.ok) throw new Error(`Upload failed: ${put.status}`);
       startTransition(() => {
-        setMediaUrls((cur) => [...cur, file_path]);
+        setMediaUrls((cur) => [...cur, blob.url]);
       });
     } catch (e) {
       setUploadError((e as Error).message);

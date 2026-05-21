@@ -6,11 +6,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { socialPosts } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
-import {
-  scheduleImagePost,
-  scheduleVideoPost,
-  getUploadUrl,
-} from "@/lib/platforms/oneup";
+import { del } from "@vercel/blob";
+import { scheduleImagePost, scheduleVideoPost } from "@/lib/platforms/oneup";
 import { logAudit } from "@/lib/audit";
 
 const SocialAccount = z.object({
@@ -268,14 +265,57 @@ export async function runDuePostsForAllWorkspaces(): Promise<{
   return { attempted: due.length, posted, failed };
 }
 
-// Used by /social/new — server action to fetch a pre-signed upload URL.
-// The client PUTs the file directly to S3, then submits the form with file_path.
-export async function getOneUpUploadUrl(): Promise<{
-  upload_url: string;
-  file_path: string;
-}> {
-  await requireSessionWithCap("social.post.create");
-  return getUploadUrl();
+// Deletes Vercel Blob media for posts that resolved (posted or failed) more
+// than `daysOld` ago, then clears the URLs from the row so we don't try again.
+// Only touches URLs on Vercel Blob — pasted public URLs are left alone.
+export async function sweepOldMedia(
+  daysOld = 14,
+): Promise<{ scanned: number; deleted: number }> {
+  const cutoff = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
+  const rows = await db
+    .select({
+      id: socialPosts.id,
+      mediaUrls: socialPosts.mediaUrls,
+      thumbnailUrl: socialPosts.thumbnailUrl,
+    })
+    .from(socialPosts)
+    .where(
+      and(
+        or(
+          eq(socialPosts.status, "posted"),
+          eq(socialPosts.status, "failed"),
+        )!,
+        lte(socialPosts.postedAt, cutoff),
+      ),
+    )
+    .limit(500);
+
+  let deleted = 0;
+  for (const r of rows) {
+    const blobUrls = [...r.mediaUrls, r.thumbnailUrl ?? ""].filter(
+      (u) => u && u.includes(".public.blob.vercel-storage.com"),
+    );
+    if (blobUrls.length === 0) continue;
+    try {
+      await del(blobUrls);
+      deleted += blobUrls.length;
+    } catch (err) {
+      console.error("[sweepOldMedia] failed to delete blobs", r.id, err);
+      continue;
+    }
+    await db
+      .update(socialPosts)
+      .set({
+        mediaUrls: r.mediaUrls.filter(
+          (u) => !u.includes(".public.blob.vercel-storage.com"),
+        ),
+        thumbnailUrl: r.thumbnailUrl?.includes(".public.blob.vercel-storage.com")
+          ? null
+          : r.thumbnailUrl,
+      })
+      .where(eq(socialPosts.id, r.id));
+  }
+  return { scanned: rows.length, deleted };
 }
 
 // Used by /social/new — list OneUp categories for picker.

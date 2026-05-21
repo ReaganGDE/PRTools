@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { runDuePostsForAllWorkspaces } from "@/app/(app)/social/actions";
+import {
+  runDuePostsForAllWorkspaces,
+  sweepOldMedia,
+} from "@/app/(app)/social/actions";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -15,7 +18,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const result = await runDuePostsForAllWorkspaces();
-  return NextResponse.json({ ok: true, ...result });
+  const sweep = await sweepOldMedia(14).catch((e) => ({
+    error: (e as Error).message,
+  }));
+  return NextResponse.json({ ok: true, ...result, sweep });
 }
 
 export const POST = GET;

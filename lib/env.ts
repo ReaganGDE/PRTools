@@ -44,4 +44,5 @@ export const env = {
   INNGEST_EVENT_KEY: optional("INNGEST_EVENT_KEY"),
   INNGEST_SIGNING_KEY: optional("INNGEST_SIGNING_KEY"),
   ONEUP_API_KEY: optional("ONEUP_API_KEY"),
+  BLOB_READ_WRITE_TOKEN: optional("BLOB_READ_WRITE_TOKEN"),
 };
