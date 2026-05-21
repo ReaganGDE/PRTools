@@ -9,6 +9,7 @@ import { requireSessionWithCap } from "@/lib/auth-helpers";
 import { del } from "@vercel/blob";
 import { scheduleImagePost, scheduleVideoPost } from "@/lib/platforms/oneup";
 import { logAudit } from "@/lib/audit";
+import { getActiveBrandId } from "@/lib/brand-context";
 
 const SocialAccount = z.object({
   id: z.string().min(1),
@@ -151,10 +152,14 @@ export async function createPost(formData: FormData) {
     }
   }
 
+  const formBrandId = (formData.get("brandId") as string | null) || null;
+  const brandId = formBrandId || (await getActiveBrandId());
+
   const [row] = await db
     .insert(socialPosts)
     .values({
       workspaceId: session.workspaceId,
+      brandId,
       platform,
       body: parsed.body,
       title: parsed.title ?? null,

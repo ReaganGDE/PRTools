@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { Calendar, List, Plus } from "lucide-react";
 import { db } from "@/lib/db";
 import { socialPosts } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { can } from "@/lib/permissions";
+import { getActiveBrandId } from "@/lib/brand-context";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -20,11 +21,19 @@ export default async function SocialPage({
   const canCreate = can(session.role, "social.post.create");
   const sp = await searchParams;
   const view = sp.view === "calendar" ? "calendar" : "list";
+  const activeBrandId = await getActiveBrandId();
+
+  const whereClause = activeBrandId
+    ? and(
+        eq(socialPosts.workspaceId, session.workspaceId),
+        eq(socialPosts.brandId, activeBrandId),
+      )
+    : eq(socialPosts.workspaceId, session.workspaceId);
 
   const rows = await db
     .select()
     .from(socialPosts)
-    .where(eq(socialPosts.workspaceId, session.workspaceId))
+    .where(whereClause)
     .orderBy(desc(socialPosts.createdAt))
     .limit(100);
 

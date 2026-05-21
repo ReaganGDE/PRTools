@@ -58,7 +58,16 @@ function hasReddit(types: string[]): boolean {
 
 type ScheduleMode = "publish" | "schedule" | "draft";
 
-export function NewPostForm() {
+type BrandOpt = { id: string; name: string; color: string };
+
+export function NewPostForm({
+  brands,
+  defaultBrandId,
+}: {
+  brands: BrandOpt[];
+  defaultBrandId: string | null;
+}) {
+  const [brandId, setBrandId] = useState<string>(defaultBrandId ?? "");
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [categoryId, setCategoryId] = useState<string>("");
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -150,12 +159,52 @@ export function NewPostForm() {
         <input type="hidden" name="mediaKind" value={mediaKind} />
         <input type="hidden" name="thumbnailUrl" value={thumbnailUrl} />
         <input type="hidden" name="action" value={mode} />
+        <input type="hidden" name="brandId" value={brandId} />
 
         {loadError ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
             OneUp error: {loadError}. Check <code>ONEUP_API_KEY</code> in Vercel.
           </div>
         ) : null}
+
+        {/* BRAND */}
+        {brands.length > 0 && (
+          <Section title="Brand">
+            <div className="flex flex-wrap gap-2">
+              {brands.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => setBrandId(b.id)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+                    brandId === b.id
+                      ? "border-red-600 bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300"
+                      : "border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900",
+                  )}
+                >
+                  <span
+                    className="h-3 w-3 rounded-sm"
+                    style={{ backgroundColor: b.color }}
+                  />
+                  {b.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setBrandId("")}
+                className={cn(
+                  "rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+                  !brandId
+                    ? "border-zinc-400 bg-zinc-100 text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                    : "border-zinc-200 text-zinc-500 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900",
+                )}
+              >
+                No brand
+              </button>
+            </div>
+          </Section>
+        )}
 
         {/* WHERE */}
         <Section title="Where">

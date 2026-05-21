@@ -197,6 +197,65 @@ export const workspaceInvites = pgTable(
   (t) => [index("invites_workspace_idx").on(t.workspaceId)],
 );
 
+/* ────────────────────── Brands ────────────────────── */
+
+export const brandTypeEnum = pgEnum("brand_type", [
+  "company",
+  "streaming",
+  "label",
+]);
+
+export const brands = pgTable(
+  "brands",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    type: brandTypeEnum("type").default("company").notNull(),
+    color: text("color").default("#dc2626").notNull(),
+    active: boolean("active").default(true).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("brands_workspace_idx").on(t.workspaceId)],
+);
+
+/* ────────────────────── Movies ────────────────────── */
+
+export const movieStatusEnum = pgEnum("movie_status", [
+  "in_production",
+  "pre_release",
+  "released",
+  "archived",
+]);
+
+export const movies = pgTable(
+  "movies",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    brandId: text("brand_id").references(() => brands.id, {
+      onDelete: "set null",
+    }),
+    title: text("title").notNull(),
+    releaseDate: timestamp("release_date"),
+    distributor: text("distributor"),
+    mpaaRating: text("mpaa_rating"),
+    synopsis: text("synopsis"),
+    posterUrl: text("poster_url"),
+    manageSocials: boolean("manage_socials").default(true).notNull(),
+    status: movieStatusEnum("status").default("in_production").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("movies_workspace_idx").on(t.workspaceId),
+    index("movies_brand_idx").on(t.brandId),
+  ],
+);
+
 /* ────────────────── Connected social accounts ────────────────── */
 
 export const socialAccounts = pgTable("social_accounts", {
@@ -417,6 +476,12 @@ export const socialPosts = pgTable("social_posts", {
   workspaceId: text("workspace_id")
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
+  brandId: text("brand_id").references(() => brands.id, {
+    onDelete: "set null",
+  }),
+  movieId: text("movie_id").references(() => movies.id, {
+    onDelete: "set null",
+  }),
   platform: platformEnum("platform").notNull(),
   status: socialPostStatusEnum("status").default("draft").notNull(),
   body: text("body").notNull(),

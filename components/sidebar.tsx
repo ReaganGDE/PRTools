@@ -13,6 +13,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandSwitcher, type BrandOption } from "@/components/brand-switcher";
 
 const NAV_GROUPS: {
   label: string | null;
@@ -46,8 +47,12 @@ const NAV_GROUPS: {
 
 export function Sidebar({
   user,
+  brands,
+  activeBrandId,
 }: {
   user: { email?: string | null; name?: string | null };
+  brands: BrandOption[];
+  activeBrandId: string | null;
 }) {
   const pathname = usePathname();
   const initials = (user.name ?? user.email ?? "?")
@@ -70,6 +75,8 @@ export function Sidebar({
           </div>
         </div>
       </div>
+
+      <BrandSwitcher brands={brands} activeBrandId={activeBrandId} />
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
         {NAV_GROUPS.map((group, gi) => (

@@ -11,6 +11,7 @@ import {
 import { db } from "@/lib/db";
 import { contacts, campaigns, sends, mentions, socialPosts } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
+import { getActiveBrandId } from "@/lib/brand-context";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -18,9 +19,17 @@ import { cn } from "@/lib/utils";
 export default async function DashboardPage() {
   const session = await requireSession();
   const wsId = session.workspaceId;
+  const activeBrandId = await getActiveBrandId();
 
   const now = new Date();
   const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  const socialBrandFilter = activeBrandId
+    ? and(
+        eq(socialPosts.workspaceId, wsId),
+        eq(socialPosts.brandId, activeBrandId),
+      )!
+    : eq(socialPosts.workspaceId, wsId);
 
   const [
     [{ value: contactCount }],
@@ -47,7 +56,7 @@ export default async function DashboardPage() {
       .from(socialPosts)
       .where(
         and(
-          eq(socialPosts.workspaceId, wsId),
+          socialBrandFilter,
           eq(socialPosts.status, "scheduled"),
           gte(socialPosts.scheduledAt, now),
           lte(socialPosts.scheduledAt, weekEnd),
@@ -64,9 +73,7 @@ export default async function DashboardPage() {
         error: socialPosts.error,
       })
       .from(socialPosts)
-      .where(
-        and(eq(socialPosts.workspaceId, wsId), eq(socialPosts.status, "failed")),
-      )
+      .where(and(socialBrandFilter, eq(socialPosts.status, "failed")))
       .orderBy(desc(socialPosts.createdAt))
       .limit(5),
     db
@@ -74,7 +81,7 @@ export default async function DashboardPage() {
       .from(socialPosts)
       .where(
         and(
-          eq(socialPosts.workspaceId, wsId),
+          socialBrandFilter,
           or(
             eq(socialPosts.status, "scheduled"),
             eq(socialPosts.status, "draft"),
