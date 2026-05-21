@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import Resend from "next-auth/providers/resend";
+import Google from "next-auth/providers/google";
 import { db } from "@/lib/db";
 import {
   users,
@@ -11,6 +12,23 @@ import {
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
+const providers = [
+  Resend({
+    apiKey: process.env.RESEND_API_KEY ?? "",
+    from: process.env.EMAIL_FROM ?? "noreply@example.com",
+  }),
+  ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+    ? [
+        Google({
+          clientId: process.env.GOOGLE_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        }),
+      ]
+    : []),
+];
+
+export { providers };
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db, {
     usersTable: users,
@@ -18,17 +36,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     sessionsTable: sessions,
     verificationTokensTable: verificationTokens,
   }),
-  session: { strategy: "database" },
+  session: {
+    strategy: "database",
+    maxAge: 90 * 24 * 60 * 60, // 90 days
+    updateAge: 7 * 24 * 60 * 60, // refresh DB row once a week
+  },
   pages: {
     signIn: "/login",
     verifyRequest: "/verify",
   },
-  providers: [
-    Resend({
-      apiKey: process.env.RESEND_API_KEY ?? "",
-      from: process.env.EMAIL_FROM ?? "noreply@example.com",
-    }),
-  ],
+  providers,
   callbacks: {
     async signIn({ user }) {
       if (!user.email) return false;
