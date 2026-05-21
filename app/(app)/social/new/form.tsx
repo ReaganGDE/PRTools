@@ -1,14 +1,17 @@
 "use client";
 import { useEffect, useState, useTransition } from "react";
 import { upload } from "@vercel/blob/client";
+import { Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   createPost,
   listOneUpCategories,
   listOneUpCategoryAccounts,
 } from "../actions";
+import { PostPreview } from "./preview";
 
 type Category = { id: number; category_name: string };
 type Account = {
@@ -36,10 +39,14 @@ export function NewPostForm() {
   const [mediaKind, setMediaKind] = useState<"image" | "video">("image");
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [subreddit, setSubreddit] = useState("");
   const [scheduled, setScheduled] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -100,269 +107,374 @@ export function NewPostForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid max-w-2xl gap-4">
-      <input type="hidden" name="categoryId" value={categoryId} />
-      <input
-        type="hidden"
-        name="accounts"
-        value={JSON.stringify(
-          selectedAccounts.map((a) => ({
-            id: a.social_network_id,
-            name: a.social_network_name,
-            type: a.social_network_type,
-          })),
-        )}
-      />
-      <input type="hidden" name="mediaKind" value={mediaKind} />
-      <input
-        type="hidden"
-        name="mediaUrls"
-        value={JSON.stringify(mediaUrls)}
-      />
-      <input type="hidden" name="thumbnailUrl" value={thumbnailUrl} />
+    <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+      <form onSubmit={handleSubmit} className="grid gap-5">
+        <input type="hidden" name="categoryId" value={categoryId} />
+        <input
+          type="hidden"
+          name="accounts"
+          value={JSON.stringify(
+            selectedAccounts.map((a) => ({
+              id: a.social_network_id,
+              name: a.social_network_name,
+              type: a.social_network_type,
+            })),
+          )}
+        />
+        <input type="hidden" name="mediaKind" value={mediaKind} />
+        <input
+          type="hidden"
+          name="mediaUrls"
+          value={JSON.stringify(mediaUrls)}
+        />
+        <input type="hidden" name="thumbnailUrl" value={thumbnailUrl} />
 
-      {loadError ? (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
-          OneUp error: {loadError}. Check <code>ONEUP_API_KEY</code> in Vercel.
-        </div>
-      ) : null}
-
-      <div className="grid gap-2">
-        <Label htmlFor="category">Category</Label>
-        <select
-          id="category"
-          required
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className="rounded-md border border-zinc-200 bg-white p-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-        >
-          <option value="">
-            {categories ? "Pick a category…" : "Loading…"}
-          </option>
-          {categories?.map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.category_name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {accounts.length > 0 ? (
-        <div className="grid gap-2">
-          <Label>Post to</Label>
-          <div className="grid gap-1 rounded-md border border-zinc-200 p-2 dark:border-zinc-800">
-            {accounts.map((a) => {
-              const checked = selectedIds.includes(a.social_network_id);
-              return (
-                <label
-                  key={a.social_network_id}
-                  className="flex cursor-pointer items-center gap-2 rounded-sm p-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(e) => {
-                      setSelectedIds((cur) =>
-                        e.target.checked
-                          ? [...cur, a.social_network_id]
-                          : cur.filter((x) => x !== a.social_network_id),
-                      );
-                    }}
-                  />
-                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800">
-                    {a.social_network_type}
-                  </span>
-                  <span className="truncate">{a.social_network_name}</span>
-                </label>
-              );
-            })}
+        {loadError ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+            OneUp error: {loadError}. Check <code>ONEUP_API_KEY</code> in Vercel.
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      <div className="grid gap-2">
-        <Label>Media type</Label>
-        <div className="flex gap-2">
-          {(["image", "video"] as const).map((k) => (
+        <Section title="Where">
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="category">Category</Label>
+              <select
+                id="category"
+                required
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="rounded-md border border-zinc-200 bg-white p-2 text-sm transition-colors focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400/30 dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <option value="">
+                  {categories ? "Pick a category…" : "Loading…"}
+                </option>
+                {categories?.map((c) => (
+                  <option key={c.id} value={String(c.id)}>
+                    {c.category_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {accounts.length > 0 ? (
+              <div className="grid gap-1.5">
+                <Label>Accounts</Label>
+                <div className="grid gap-0.5 rounded-md border border-zinc-200 p-1.5 dark:border-zinc-800">
+                  {accounts.map((a) => {
+                    const checked = selectedIds.includes(a.social_network_id);
+                    return (
+                      <label
+                        key={a.social_network_id}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors",
+                          checked
+                            ? "bg-red-50 dark:bg-red-950/20"
+                            : "hover:bg-zinc-50 dark:hover:bg-zinc-900",
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            setSelectedIds((cur) =>
+                              e.target.checked
+                                ? [...cur, a.social_network_id]
+                                : cur.filter((x) => x !== a.social_network_id),
+                            );
+                          }}
+                          className="accent-red-600"
+                        />
+                        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium dark:bg-zinc-800">
+                          {a.social_network_type}
+                        </span>
+                        <span className="truncate">{a.social_network_name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </Section>
+
+        <Section title="Media">
+          <div className="grid gap-3">
+            <div className="flex gap-2">
+              {(["image", "video"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => {
+                    setMediaKind(k);
+                    setMediaUrls([]);
+                  }}
+                  className={cn(
+                    "rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition-colors",
+                    mediaKind === k
+                      ? "border-red-600 bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-300"
+                      : "border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900",
+                  )}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+
             <label
-              key={k}
-              className={`cursor-pointer rounded-md border px-3 py-2 text-sm capitalize ${
-                mediaKind === k
-                  ? "border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-900"
-                  : "border-zinc-200 dark:border-zinc-800"
-              }`}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                setDragActive(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                setDragActive(false);
+              }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragActive(false);
+                const files = Array.from(e.dataTransfer.files);
+                for (const f of files) handleFile(f);
+              }}
+              className={cn(
+                "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors",
+                dragActive
+                  ? "border-red-500 bg-red-50/50 dark:bg-red-950/20"
+                  : "border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600",
+                uploading ? "pointer-events-none opacity-60" : "",
+              )}
             >
               <input
-                type="radio"
-                checked={mediaKind === k}
-                onChange={() => {
-                  setMediaKind(k);
-                  setMediaUrls([]);
+                type="file"
+                accept={mediaKind === "video" ? "video/*" : "image/*"}
+                multiple={mediaKind === "image"}
+                disabled={uploading}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  for (const f of files) handleFile(f);
+                  e.target.value = "";
                 }}
-                className="sr-only"
+                className="hidden"
               />
-              {k}
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-2">
-        <Label>{mediaKind === "video" ? "Video file" : "Image file(s)"}</Label>
-        <input
-          type="file"
-          accept={mediaKind === "video" ? "video/*" : "image/*"}
-          multiple={mediaKind === "image"}
-          disabled={uploading}
-          onChange={(e) => {
-            const files = Array.from(e.target.files ?? []);
-            for (const f of files) handleFile(f);
-            e.target.value = "";
-          }}
-          className="text-sm"
-        />
-        {uploading ? (
-          <p className="text-xs text-zinc-500">Uploading…</p>
-        ) : null}
-        {uploadError ? (
-          <p className="text-xs text-red-600">{uploadError}</p>
-        ) : null}
-        {mediaUrls.length > 0 ? (
-          <ul className="space-y-1 text-xs">
-            {mediaUrls.map((u, i) => (
-              <li key={u} className="flex items-center justify-between gap-2">
-                <span className="truncate text-zinc-600 dark:text-zinc-400">
-                  {u}
+              <Upload className="h-5 w-5 text-zinc-400" />
+              <div className="text-sm">
+                <span className="font-medium text-red-600 dark:text-red-400">
+                  Click to upload
                 </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMediaUrls((cur) => cur.filter((_, j) => j !== i))
+                <span className="text-zinc-500"> or drag and drop</span>
+              </div>
+              <div className="text-xs text-zinc-500">
+                {mediaKind === "video"
+                  ? "MP4, MOV up to 1GB"
+                  : "PNG, JPG, GIF up to 1GB"}
+              </div>
+            </label>
+
+            {uploading ? (
+              <p className="text-xs text-zinc-500">Uploading…</p>
+            ) : null}
+            {uploadError ? (
+              <p className="text-xs text-red-600">{uploadError}</p>
+            ) : null}
+
+            {mediaUrls.length > 0 ? (
+              <ul className="grid gap-1.5">
+                {mediaUrls.map((u, i) => (
+                  <li
+                    key={u}
+                    className="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-zinc-900"
+                  >
+                    <span className="truncate text-zinc-600 dark:text-zinc-400">
+                      {u.split("/").pop()}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMediaUrls((cur) => cur.filter((_, j) => j !== i))
+                      }
+                      className="ml-auto rounded p-0.5 text-zinc-500 hover:bg-zinc-200 hover:text-red-600 dark:hover:bg-zinc-700"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            <details className="text-xs text-zinc-500">
+              <summary className="cursor-pointer select-none hover:text-zinc-700 dark:hover:text-zinc-300">
+                Or paste a public URL
+              </summary>
+              <input
+                type="url"
+                placeholder="https://…"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const v = (e.target as HTMLInputElement).value.trim();
+                    if (v) {
+                      setMediaUrls((cur) => [...cur, v]);
+                      (e.target as HTMLInputElement).value = "";
+                    }
                   }
-                  className="text-red-600 hover:underline"
-                >
-                  remove
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <p className="text-xs text-zinc-500">
-          Or paste a public URL:{" "}
-          <input
-            type="url"
-            placeholder="https://…"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                const v = (e.target as HTMLInputElement).value.trim();
-                if (v) {
-                  setMediaUrls((cur) => [...cur, v]);
-                  (e.target as HTMLInputElement).value = "";
-                }
-              }
-            }}
-            className="ml-1 w-72 rounded-md border border-zinc-200 px-2 py-1 text-xs dark:border-zinc-800 dark:bg-zinc-950"
-          />
-        </p>
-      </div>
+                }}
+                className="mt-2 w-full rounded-md border border-zinc-200 px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+              />
+            </details>
 
-      {mediaKind === "video" ? (
-        <div className="grid gap-2">
-          <Label htmlFor="thumbnailUrl">Thumbnail URL (optional)</Label>
-          <Input
-            id="thumbnailUrl"
-            type="url"
-            value={thumbnailUrl}
-            onChange={(e) => setThumbnailUrl(e.target.value)}
-            placeholder="https://…"
-          />
-        </div>
-      ) : null}
+            {mediaKind === "video" ? (
+              <div className="grid gap-1.5">
+                <Label htmlFor="thumbnailUrl">Thumbnail URL (optional)</Label>
+                <Input
+                  id="thumbnailUrl"
+                  type="url"
+                  value={thumbnailUrl}
+                  onChange={(e) => setThumbnailUrl(e.target.value)}
+                  placeholder="https://…"
+                />
+              </div>
+            ) : null}
+          </div>
+        </Section>
 
-      {needsTitle(selectedTypes) ? (
-        <div className="grid gap-2">
-          <Label htmlFor="title">Title (Reddit / YouTube / Threads)</Label>
-          <Input id="title" name="title" maxLength={300} />
-        </div>
-      ) : null}
+        <Section title="Content">
+          <div className="grid gap-3">
+            {needsTitle(selectedTypes) ? (
+              <div className="grid gap-1.5">
+                <Label htmlFor="title">
+                  Title{" "}
+                  <span className="text-zinc-500">
+                    (Reddit / YouTube / Threads)
+                  </span>
+                </Label>
+                <Input
+                  id="title"
+                  name="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={300}
+                />
+              </div>
+            ) : null}
 
-      {hasReddit(selectedTypes) ? (
-        <div className="grid gap-2">
-          <Label htmlFor="subreddit">Subreddit (without r/)</Label>
-          <Input
-            id="subreddit"
-            name="subreddit"
-            placeholder="e.g. movies — or u_yourusername for your profile"
-          />
-        </div>
-      ) : null}
+            {hasReddit(selectedTypes) ? (
+              <div className="grid gap-1.5">
+                <Label htmlFor="subreddit">Subreddit</Label>
+                <Input
+                  id="subreddit"
+                  name="subreddit"
+                  value={subreddit}
+                  onChange={(e) => setSubreddit(e.target.value)}
+                  placeholder="e.g. movies — or u_yourusername for your profile"
+                />
+              </div>
+            ) : null}
 
-      <div className="grid gap-2">
-        <Label htmlFor="body">Caption</Label>
-        <textarea
-          id="body"
-          name="body"
-          required
-          rows={6}
-          className="rounded-md border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-        />
-      </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="body">Caption</Label>
+              <textarea
+                id="body"
+                name="body"
+                required
+                rows={6}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                className="rounded-md border border-zinc-200 bg-white p-3 text-sm transition-colors focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400/30 dark:border-zinc-800 dark:bg-zinc-950"
+                placeholder="What do you want to say?"
+              />
+            </div>
+          </div>
+        </Section>
 
-      <div className="grid gap-2">
-        <Label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={scheduled}
-            onChange={(e) => setScheduled(e.target.checked)}
-          />
-          Schedule for later
-        </Label>
-        {scheduled ? (
-          <Input
-            type="datetime-local"
-            name="scheduledAt"
-            required
-            min={new Date().toISOString().slice(0, 16)}
-          />
-        ) : null}
-      </div>
+        <Section title="Schedule">
+          <div className="grid gap-3">
+            <Label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={scheduled}
+                onChange={(e) => setScheduled(e.target.checked)}
+                className="accent-red-600"
+              />
+              Schedule for later
+            </Label>
+            {scheduled ? (
+              <Input
+                type="datetime-local"
+                name="scheduledAt"
+                required
+                min={new Date().toISOString().slice(0, 16)}
+              />
+            ) : null}
+          </div>
+        </Section>
 
-      <div className="flex gap-2">
-        {scheduled ? (
-          <Button
-            type="submit"
-            name="action"
-            value="schedule"
-            disabled={busy || mediaUrls.length === 0 || selectedIds.length === 0 || !categoryId}
-          >
-            {isPending ? "Scheduling…" : "Schedule"}
-          </Button>
-        ) : (
-          <>
+        <div className="flex flex-wrap items-center gap-2 border-t border-zinc-200 pt-5 dark:border-zinc-800">
+          {scheduled ? (
             <Button
               type="submit"
               name="action"
-              value="publish"
+              value="schedule"
               disabled={busy || mediaUrls.length === 0 || selectedIds.length === 0 || !categoryId}
             >
-              {isPending ? "Posting…" : "Post now"}
+              {isPending ? "Scheduling…" : "Schedule post"}
             </Button>
-            <Button
-              type="submit"
-              name="action"
-              value="draft"
-              variant="outline"
-              disabled={busy || !categoryId}
-            >
-              {isPending ? "Saving…" : "Save as draft"}
-            </Button>
-          </>
-        )}
+          ) : (
+            <>
+              <Button
+                type="submit"
+                name="action"
+                value="publish"
+                disabled={busy || mediaUrls.length === 0 || selectedIds.length === 0 || !categoryId}
+              >
+                {isPending ? "Posting…" : "Post now"}
+              </Button>
+              <Button
+                type="submit"
+                name="action"
+                value="draft"
+                variant="outline"
+                disabled={busy || !categoryId}
+              >
+                {isPending ? "Saving…" : "Save as draft"}
+              </Button>
+            </>
+          )}
+          {isPending ? (
+            <span className="text-xs text-zinc-500">
+              Sending to OneUp, please wait…
+            </span>
+          ) : null}
+        </div>
+      </form>
+
+      <aside className="hidden lg:block">
+        <PostPreview
+          selectedTypes={selectedTypes}
+          title={title}
+          body={body}
+          subreddit={subreddit}
+          mediaUrls={mediaUrls}
+          mediaKind={mediaKind}
+        />
+      </aside>
+    </div>
+  );
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+        {title}
       </div>
-      {isPending ? (
-        <p className="text-xs text-zinc-500">Sending to OneUp, please wait…</p>
-      ) : null}
-    </form>
+      {children}
+    </div>
   );
 }
