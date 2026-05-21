@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useTransition } from "react";
+import Image from "next/image";
 import { upload } from "@vercel/blob/client";
 import { Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,30 @@ type Account = {
   social_network_type: string;
 };
 
+const CHAR_LIMITS: Record<string, number> = {
+  x: 280,
+  twitter: 280,
+  threads: 500,
+  linkedin: 3000,
+  instagram: 2200,
+  facebook: 63206,
+  tiktok: 2200,
+  reddit: 40000,
+  youtube: 5000,
+  bluesky: 300,
+};
+
+function getCharLimit(types: string[]): number | null {
+  const limits = types.map((t) => {
+    const k = t.toLowerCase();
+    for (const [key, val] of Object.entries(CHAR_LIMITS)) {
+      if (k.includes(key)) return val;
+    }
+    return null;
+  }).filter((v): v is number => v !== null);
+  return limits.length > 0 ? Math.min(...limits) : null;
+}
+
 function needsTitle(types: string[]): boolean {
   return types.some((t) => {
     const k = t.toLowerCase();
@@ -31,18 +56,20 @@ function hasReddit(types: string[]): boolean {
   return types.some((t) => t.toLowerCase().includes("reddit"));
 }
 
+type ScheduleMode = "publish" | "schedule" | "draft";
+
 export function NewPostForm() {
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [categoryId, setCategoryId] = useState<string>("");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [mediaKind, setMediaKind] = useState<"image" | "video">("image");
-  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<{ url: string; name: string; isBlob: boolean }[]>([]);
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [subreddit, setSubreddit] = useState("");
-  const [scheduled, setScheduled] = useState(false);
+  const [mode, setMode] = useState<ScheduleMode>("publish");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -69,6 +96,8 @@ export function NewPostForm() {
     selectedIds.includes(a.social_network_id),
   );
   const selectedTypes = selectedAccounts.map((a) => a.social_network_type);
+  const mediaUrls = mediaFiles.map((f) => f.url);
+  const charLimit = getCharLimit(selectedTypes);
 
   async function handleFile(file: File) {
     setUploading(true);
@@ -79,9 +108,7 @@ export function NewPostForm() {
         handleUploadUrl: "/api/upload",
         contentType: file.type,
       });
-      startTransition(() => {
-        setMediaUrls((cur) => [...cur, blob.url]);
-      });
+      setMediaFiles((cur) => [...cur, { url: blob.url, name: file.name, isBlob: true }]);
     } catch (e) {
       setUploadError((e as Error).message);
     } finally {
@@ -101,33 +128,28 @@ export function NewPostForm() {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     fd.set("clientNow", localNow());
+    fd.set("mediaUrls", JSON.stringify(mediaUrls));
+    fd.set("accounts", JSON.stringify(
+      selectedAccounts.map((a) => ({
+        id: a.social_network_id,
+        name: a.social_network_name,
+        type: a.social_network_type,
+      })),
+    ));
     startTransition(async () => {
       await createPost(fd);
     });
   }
 
+  const canSubmit = mediaUrls.length > 0 && selectedIds.length > 0 && !!categoryId;
+
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-      <form onSubmit={handleSubmit} className="grid gap-5">
+      <form onSubmit={handleSubmit} className="grid gap-4">
         <input type="hidden" name="categoryId" value={categoryId} />
-        <input
-          type="hidden"
-          name="accounts"
-          value={JSON.stringify(
-            selectedAccounts.map((a) => ({
-              id: a.social_network_id,
-              name: a.social_network_name,
-              type: a.social_network_type,
-            })),
-          )}
-        />
         <input type="hidden" name="mediaKind" value={mediaKind} />
-        <input
-          type="hidden"
-          name="mediaUrls"
-          value={JSON.stringify(mediaUrls)}
-        />
         <input type="hidden" name="thumbnailUrl" value={thumbnailUrl} />
+        <input type="hidden" name="action" value={mode} />
 
         {loadError ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
@@ -135,6 +157,7 @@ export function NewPostForm() {
           </div>
         ) : null}
 
+        {/* WHERE */}
         <Section title="Where">
           <div className="grid gap-3">
             <div className="grid gap-1.5">
@@ -198,6 +221,7 @@ export function NewPostForm() {
           </div>
         </Section>
 
+        {/* MEDIA */}
         <Section title="Media">
           <div className="grid gap-3">
             <div className="flex gap-2">
@@ -207,7 +231,7 @@ export function NewPostForm() {
                   type="button"
                   onClick={() => {
                     setMediaKind(k);
-                    setMediaUrls([]);
+                    setMediaFiles([]);
                   }}
                   className={cn(
                     "rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition-colors",
@@ -221,15 +245,47 @@ export function NewPostForm() {
               ))}
             </div>
 
+            {/* Image thumbnails */}
+            {mediaFiles.length > 0 && mediaKind === "image" && (
+              <div className="grid grid-cols-3 gap-2">
+                {mediaFiles.map((f, i) => (
+                  <div key={f.url} className="group/thumb relative aspect-square overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800">
+                    <Image src={f.url} alt={f.name} fill className="object-cover" unoptimized />
+                    <button
+                      type="button"
+                      onClick={() => setMediaFiles((cur) => cur.filter((_, j) => j !== i))}
+                      className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 opacity-0 transition-opacity group-hover/thumb:opacity-100"
+                    >
+                      <X className="h-3 w-3 text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {mediaFiles.length > 0 && mediaKind === "video" && (
+              <ul className="grid gap-1.5">
+                {mediaFiles.map((f, i) => (
+                  <li
+                    key={f.url}
+                    className="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-zinc-900"
+                  >
+                    <span className="truncate text-zinc-600 dark:text-zinc-400">{f.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setMediaFiles((cur) => cur.filter((_, j) => j !== i))}
+                      className="ml-auto rounded p-0.5 text-zinc-500 hover:bg-zinc-200 hover:text-red-600 dark:hover:bg-zinc-700"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
             <label
-              onDragEnter={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={(e) => {
-                e.preventDefault();
-                setDragActive(false);
-              }}
+              onDragEnter={(e) => { e.preventDefault(); setDragActive(true); }}
+              onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
@@ -238,7 +294,7 @@ export function NewPostForm() {
                 for (const f of files) handleFile(f);
               }}
               className={cn(
-                "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors",
+                "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-6 text-center transition-colors",
                 dragActive
                   ? "border-red-500 bg-red-50/50 dark:bg-red-950/20"
                   : "border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600",
@@ -260,46 +316,17 @@ export function NewPostForm() {
               <Upload className="h-5 w-5 text-zinc-400" />
               <div className="text-sm">
                 <span className="font-medium text-red-600 dark:text-red-400">
-                  Click to upload
+                  {uploading ? "Uploading…" : "Click to upload"}
                 </span>
-                <span className="text-zinc-500"> or drag and drop</span>
+                {!uploading && <span className="text-zinc-500"> or drag and drop</span>}
               </div>
               <div className="text-xs text-zinc-500">
-                {mediaKind === "video"
-                  ? "MP4, MOV up to 1GB"
-                  : "PNG, JPG, GIF up to 1GB"}
+                {mediaKind === "video" ? "MP4, MOV up to 1GB" : "PNG, JPG, GIF up to 1GB"}
               </div>
             </label>
 
-            {uploading ? (
-              <p className="text-xs text-zinc-500">Uploading…</p>
-            ) : null}
             {uploadError ? (
               <p className="text-xs text-red-600">{uploadError}</p>
-            ) : null}
-
-            {mediaUrls.length > 0 ? (
-              <ul className="grid gap-1.5">
-                {mediaUrls.map((u, i) => (
-                  <li
-                    key={u}
-                    className="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-800 dark:bg-zinc-900"
-                  >
-                    <span className="truncate text-zinc-600 dark:text-zinc-400">
-                      {u.split("/").pop()}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMediaUrls((cur) => cur.filter((_, j) => j !== i))
-                      }
-                      className="ml-auto rounded p-0.5 text-zinc-500 hover:bg-zinc-200 hover:text-red-600 dark:hover:bg-zinc-700"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
             ) : null}
 
             <details className="text-xs text-zinc-500">
@@ -314,7 +341,7 @@ export function NewPostForm() {
                     e.preventDefault();
                     const v = (e.target as HTMLInputElement).value.trim();
                     if (v) {
-                      setMediaUrls((cur) => [...cur, v]);
+                      setMediaFiles((cur) => [...cur, { url: v, name: v.split("/").pop() ?? v, isBlob: false }]);
                       (e.target as HTMLInputElement).value = "";
                     }
                   }
@@ -338,15 +365,14 @@ export function NewPostForm() {
           </div>
         </Section>
 
+        {/* CONTENT */}
         <Section title="Content">
           <div className="grid gap-3">
             {needsTitle(selectedTypes) ? (
               <div className="grid gap-1.5">
                 <Label htmlFor="title">
                   Title{" "}
-                  <span className="text-zinc-500">
-                    (Reddit / YouTube / Threads)
-                  </span>
+                  <span className="text-zinc-500">(Reddit / YouTube / Threads)</span>
                 </Label>
                 <Input
                   id="title"
@@ -372,7 +398,23 @@ export function NewPostForm() {
             ) : null}
 
             <div className="grid gap-1.5">
-              <Label htmlFor="body">Caption</Label>
+              <div className="flex items-baseline justify-between">
+                <Label htmlFor="body">Caption</Label>
+                {charLimit !== null && (
+                  <span
+                    className={cn(
+                      "text-xs tabular-nums",
+                      body.length > charLimit
+                        ? "text-red-600 dark:text-red-400"
+                        : body.length > charLimit * 0.9
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-zinc-400",
+                    )}
+                  >
+                    {body.length} / {charLimit}
+                  </span>
+                )}
+              </div>
               <textarea
                 id="body"
                 name="body"
@@ -387,18 +429,34 @@ export function NewPostForm() {
           </div>
         </Section>
 
-        <Section title="Schedule">
+        {/* SCHEDULE MODE */}
+        <Section title="Publish">
           <div className="grid gap-3">
-            <Label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={scheduled}
-                onChange={(e) => setScheduled(e.target.checked)}
-                className="accent-red-600"
-              />
-              Schedule for later
-            </Label>
-            {scheduled ? (
+            <div className="flex rounded-lg border border-zinc-200 p-1 dark:border-zinc-800">
+              {(
+                [
+                  { value: "publish", label: "Post now" },
+                  { value: "schedule", label: "Schedule" },
+                  { value: "draft", label: "Save draft" },
+                ] as { value: ScheduleMode; label: string }[]
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setMode(opt.value)}
+                  className={cn(
+                    "flex-1 rounded-md py-1.5 text-xs font-medium transition-colors",
+                    mode === opt.value
+                      ? "bg-red-600 text-white shadow-sm"
+                      : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {mode === "schedule" ? (
               <Input
                 type="datetime-local"
                 name="scheduledAt"
@@ -406,57 +464,58 @@ export function NewPostForm() {
                 min={new Date().toISOString().slice(0, 16)}
               />
             ) : null}
+
+            {mode === "publish" && (
+              <p className="text-xs text-zinc-500">
+                Posts immediately to all selected accounts via OneUp.
+              </p>
+            )}
           </div>
         </Section>
 
-        <div className="flex flex-wrap items-center gap-2 border-t border-zinc-200 pt-5 dark:border-zinc-800">
-          {scheduled ? (
-            <Button
-              type="submit"
-              name="action"
-              value="schedule"
-              disabled={busy || mediaUrls.length === 0 || selectedIds.length === 0 || !categoryId}
-            >
-              {isPending ? "Scheduling…" : "Schedule post"}
-            </Button>
-          ) : (
-            <>
-              <Button
-                type="submit"
-                name="action"
-                value="publish"
-                disabled={busy || mediaUrls.length === 0 || selectedIds.length === 0 || !categoryId}
-              >
-                {isPending ? "Posting…" : "Post now"}
-              </Button>
-              <Button
-                type="submit"
-                name="action"
-                value="draft"
-                variant="outline"
-                disabled={busy || !categoryId}
-              >
-                {isPending ? "Saving…" : "Save as draft"}
-              </Button>
-            </>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="submit"
+            disabled={busy || (mode !== "draft" && !canSubmit)}
+          >
+            {isPending
+              ? mode === "publish"
+                ? "Posting…"
+                : mode === "schedule"
+                  ? "Scheduling…"
+                  : "Saving…"
+              : mode === "publish"
+                ? "Post now"
+                : mode === "schedule"
+                  ? "Schedule post"
+                  : "Save draft"}
+          </Button>
+          {!canSubmit && mode !== "draft" && (
+            <span className="text-xs text-zinc-400">
+              {!categoryId
+                ? "Pick a category first"
+                : selectedIds.length === 0
+                  ? "Select at least one account"
+                  : "Add media to continue"}
+            </span>
           )}
           {isPending ? (
-            <span className="text-xs text-zinc-500">
-              Sending to OneUp, please wait…
-            </span>
+            <span className="text-xs text-zinc-500">Sending to OneUp, please wait…</span>
           ) : null}
         </div>
       </form>
 
       <aside className="hidden lg:block">
-        <PostPreview
-          selectedTypes={selectedTypes}
-          title={title}
-          body={body}
-          subreddit={subreddit}
-          mediaUrls={mediaUrls}
-          mediaKind={mediaKind}
-        />
+        <div className="sticky top-8">
+          <PostPreview
+            selectedTypes={selectedTypes}
+            title={title}
+            body={body}
+            subreddit={subreddit}
+            mediaUrls={mediaUrls}
+            mediaKind={mediaKind}
+          />
+        </div>
       </aside>
     </div>
   );

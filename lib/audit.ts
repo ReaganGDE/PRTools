@@ -21,6 +21,7 @@ export type AuditAction =
   // Social
   | "social.post.create"
   | "social.post.publish"
+  | "social.post.update"
   | "social.post.delete"
   // Team / workspace
   | "team.invite"

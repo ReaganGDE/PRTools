@@ -129,64 +129,66 @@ function PostRow({
 }) {
   const accounts = post.oneupSocialNetworkIds ?? [];
   return (
-    <li className="group rounded-lg border border-zinc-200 bg-white p-4 text-sm shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <PlatformPill platform={post.platform} />
-            {post.mediaKind ? (
-              <span className="rounded-full border border-zinc-200 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
-                {post.mediaKind}
+    <li className="group rounded-lg border border-zinc-200 bg-white text-sm shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950">
+      <Link href={`/social/${post.id}`} className="block p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <PlatformPill platform={post.platform} />
+              {post.mediaKind ? (
+                <span className="rounded-full border border-zinc-200 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
+                  {post.mediaKind}
+                </span>
+              ) : null}
+              <StatusBadge status={post.status} />
+              {post.scheduledAt ? (
+                <span className="text-xs text-zinc-500">
+                  {post.status === "posted" ? "posted " : "scheduled "}
+                  {(post.postedAt ?? post.scheduledAt).toLocaleString()}
+                </span>
+              ) : null}
+            </div>
+            {accounts.length > 0 ? (
+              <div className="mb-1.5 text-xs text-zinc-500">
+                {accounts.map((a) => `${a.type}: ${a.name}`).join(" · ")}
+              </div>
+            ) : null}
+            {post.title ? (
+              <div className="font-medium tracking-tight">{post.title}</div>
+            ) : null}
+            <p className="line-clamp-3 whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
+              {post.body}
+            </p>
+            {post.externalUrl ? (
+              <span className="mt-2 inline-block text-xs font-medium text-red-600 dark:text-red-400">
+                View live ↗
               </span>
             ) : null}
-            <StatusBadge status={post.status} />
-            {post.scheduledAt ? (
-              <span className="text-xs text-zinc-500">
-                {post.status === "posted" ? "posted " : "scheduled "}
-                {(post.postedAt ?? post.scheduledAt).toLocaleString()}
-              </span>
+            {post.error ? (
+              <p className="mt-1.5 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300">
+                {post.error}
+              </p>
             ) : null}
           </div>
-          {accounts.length > 0 ? (
-            <div className="mb-1.5 text-xs text-zinc-500">
-              {accounts.map((a) => `${a.type}: ${a.name}`).join(" · ")}
-            </div>
-          ) : null}
-          {post.title ? (
-            <div className="font-medium tracking-tight">{post.title}</div>
-          ) : null}
-          <p className="line-clamp-3 whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
-            {post.body}
-          </p>
-          {post.externalUrl ? (
-            <a
-              href={post.externalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 inline-block text-xs font-medium text-red-600 hover:underline dark:text-red-400"
-            >
-              View live ↗
-            </a>
-          ) : null}
-          {post.error ? (
-            <p className="mt-1.5 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300">
-              {post.error}
-            </p>
-          ) : null}
+          <span className="text-xs text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100">
+            Edit →
+          </span>
         </div>
-        {canEdit && post.status !== "posted" ? (
+      </Link>
+      {canEdit && post.status !== "posted" ? (
+        <div className="border-t border-zinc-100 px-4 py-2 dark:border-zinc-800/60">
           <form action={deletePost.bind(null, post.id)}>
             <Button
               type="submit"
               size="sm"
               variant="ghost"
-              className="text-red-600 opacity-0 group-hover:opacity-100 hover:text-red-700"
+              className="h-7 text-xs text-red-600 opacity-0 group-hover:opacity-100 hover:text-red-700"
             >
               Delete
             </Button>
           </form>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </li>
   );
 }

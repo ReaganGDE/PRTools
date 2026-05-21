@@ -357,6 +357,72 @@ export async function sweepOldMedia(
   return { scanned: rows.length, deleted };
 }
 
+export async function updatePost(postId: string, formData: FormData) {
+  const session = await requireSessionWithCap("social.post.create");
+
+  const [post] = await db
+    .select()
+    .from(socialPosts)
+    .where(
+      and(
+        eq(socialPosts.id, postId),
+        eq(socialPosts.workspaceId, session.workspaceId),
+      ),
+    );
+  if (!post) throw new Error("Post not found");
+  if (post.status === "posted") throw new Error("Cannot edit a posted post");
+
+  const title = (formData.get("title") as string | null) || null;
+  const body = formData.get("body") as string;
+  const scheduledAtRaw = formData.get("scheduledAt") as string | null;
+  const scheduledAt =
+    post.status === "scheduled" && scheduledAtRaw
+      ? new Date(scheduledAtRaw)
+      : post.scheduledAt;
+
+  await db
+    .update(socialPosts)
+    .set({ title, body, scheduledAt, error: null })
+    .where(eq(socialPosts.id, postId));
+
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "social.post.update",
+    targetType: "social_post",
+    targetId: postId,
+  });
+
+  revalidatePath("/social");
+  revalidatePath(`/social/${postId}`);
+  redirect("/social");
+}
+
+export async function retryPost(postId: string) {
+  const session = await requireSessionWithCap("social.post.create");
+
+  const [post] = await db
+    .select({ id: socialPosts.id, workspaceId: socialPosts.workspaceId })
+    .from(socialPosts)
+    .where(
+      and(
+        eq(socialPosts.id, postId),
+        eq(socialPosts.workspaceId, session.workspaceId),
+      ),
+    );
+  if (!post) throw new Error("Post not found");
+
+  await db
+    .update(socialPosts)
+    .set({ status: "scheduled", error: null })
+    .where(eq(socialPosts.id, postId));
+
+  await runPost(postId);
+
+  revalidatePath("/social");
+  redirect("/social");
+}
+
 // Used by /social/new — list OneUp categories for picker.
 export async function listOneUpCategories() {
   await requireSessionWithCap("social.post.create");
