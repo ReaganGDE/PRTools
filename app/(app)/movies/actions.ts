@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { movies, brands, workspaces } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
@@ -106,6 +106,33 @@ export type SyncResult = {
   skipped: number;
   error?: string;
 };
+
+// Find pairs of (manual movie, synced movie) with the same title in the same
+// workspace, re-point any social_posts.movie_id references, then delete the
+// manual duplicate. Safe to run repeatedly.
+async function dedupeManualMovies(workspaceId: string): Promise<number> {
+  const dupes = (await db.execute(sql`
+    SELECT manual.id AS manual_id, synced.id AS synced_id
+    FROM movies manual
+    JOIN movies synced
+      ON synced.workspace_id = manual.workspace_id
+     AND lower(synced.title) = lower(manual.title)
+     AND synced.airtable_record_id IS NOT NULL
+    WHERE manual.workspace_id = ${workspaceId}
+      AND manual.airtable_record_id IS NULL
+  `)) as unknown as { manual_id: string; synced_id: string }[];
+  let removed = 0;
+  for (const row of dupes) {
+    await db.execute(sql`
+      UPDATE social_posts
+      SET movie_id = ${row.synced_id}
+      WHERE movie_id = ${row.manual_id}
+    `);
+    await db.execute(sql`DELETE FROM movies WHERE id = ${row.manual_id}`);
+    removed++;
+  }
+  return removed;
+}
 
 export async function syncMoviesFromAirtable(): Promise<{
   results: SyncResult[];
@@ -245,7 +272,10 @@ export async function syncMoviesFromAirtable(): Promise<{
           airtableSyncedAt: new Date(),
         };
 
-        const existing = await db
+        // Match by airtable_record_id first; if not found, match by title
+        // (case-insensitive) to absorb manually-created entries that pre-date
+        // the Airtable sync.
+        const byRecordId = await db
           .select({ id: movies.id })
           .from(movies)
           .where(
@@ -255,11 +285,24 @@ export async function syncMoviesFromAirtable(): Promise<{
             ),
           );
 
-        if (existing.length > 0) {
-          await db
-            .update(movies)
-            .set(values)
-            .where(eq(movies.id, existing[0].id));
+        let existingId: string | null = byRecordId[0]?.id ?? null;
+
+        if (!existingId) {
+          const byTitle = await db
+            .select({ id: movies.id })
+            .from(movies)
+            .where(
+              and(
+                eq(movies.workspaceId, session.workspaceId),
+                sql`lower(${movies.title}) = ${title.toLowerCase()}`,
+                sql`${movies.airtableRecordId} IS NULL`,
+              ),
+            );
+          existingId = byTitle[0]?.id ?? null;
+        }
+
+        if (existingId) {
+          await db.update(movies).set(values).where(eq(movies.id, existingId));
           result.updated++;
         } else {
           await db.insert(movies).values(values);
@@ -282,6 +325,10 @@ export async function syncMoviesFromAirtable(): Promise<{
     }
     results.push(result);
   }
+
+  // After upserting, sweep any pre-existing manual duplicates that the sync
+  // didn't absorb (e.g. titles spelled slightly differently before).
+  await dedupeManualMovies(session.workspaceId);
 
   revalidatePath("/movies");
   return { results, total: { inserted: totalInserted, updated: totalUpdated } };

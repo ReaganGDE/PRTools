@@ -37,10 +37,10 @@ export default async function MoviesPage({
       .from(movies)
       .leftJoin(brands, eq(brands.id, movies.brandId))
       .where(where)
-      // Upcoming films first (release_date ASC), null dates at the end
+      // Most recent release first, null dates at the end
       .orderBy(
         sql`${movies.releaseDate} IS NULL ASC`,
-        asc(movies.releaseDate),
+        desc(movies.releaseDate),
         asc(movies.title),
       ),
     getBrandsForWorkspace(session.workspaceId),
