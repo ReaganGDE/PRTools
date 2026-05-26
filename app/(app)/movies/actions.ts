@@ -14,6 +14,7 @@ import {
   readNumber,
   readString,
 } from "@/lib/integrations/airtable";
+import { searchMoviePoster } from "@/lib/integrations/tmdb";
 
 const STATUSES = ["in_production", "pre_release", "released", "archived"] as const;
 type Status = (typeof STATUSES)[number];
@@ -156,6 +157,42 @@ async function dedupeMovies(workspaceId: string): Promise<number> {
   return removed;
 }
 
+// Fetch posters from TMDB for any movie in the workspace that doesn't have one.
+// Returns the number of posters added.
+export async function backfillPostersFromTmdb(): Promise<{
+  scanned: number;
+  found: number;
+}> {
+  const session = await requireSession();
+  const rows = await db
+    .select({
+      id: movies.id,
+      title: movies.title,
+      releaseDate: movies.releaseDate,
+    })
+    .from(movies)
+    .where(
+      and(
+        eq(movies.workspaceId, session.workspaceId),
+        sql`${movies.posterUrl} IS NULL`,
+      ),
+    );
+
+  let found = 0;
+  for (const row of rows) {
+    const url = await searchMoviePoster(
+      row.title,
+      row.releaseDate?.getFullYear() ?? null,
+    );
+    if (url) {
+      await db.update(movies).set({ posterUrl: url }).where(eq(movies.id, row.id));
+      found++;
+    }
+  }
+  revalidatePath("/movies");
+  return { scanned: rows.length, found };
+}
+
 export async function syncMoviesFromAirtable(): Promise<{
   results: SyncResult[];
   total: { inserted: number; updated: number };
@@ -237,10 +274,17 @@ export async function syncMoviesFromAirtable(): Promise<{
         // TVOD Date is the canonical release date for our workflow.
         const releaseDate = tvodDate ?? theatricalDate ?? avodDate ?? null;
 
-        const posterUrl = pickPosterUrl(
+        let posterUrl = pickPosterUrl(
           readAttachments(f, "Stills & Press Materials") ??
             readAttachments(f, "Attachments"),
         );
+        // Fall back to TMDB if Airtable doesn't have a poster for this title.
+        if (!posterUrl) {
+          posterUrl = await searchMoviePoster(
+            title,
+            releaseDate?.getFullYear() ?? null,
+          );
+        }
 
         // Infer status from release date so synced films aren't all "in_production"
         const today = new Date();

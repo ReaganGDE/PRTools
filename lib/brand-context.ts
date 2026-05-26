@@ -23,7 +23,7 @@ export async function getBrandsForWorkspace(workspaceId: string) {
 const DEFAULTS: { name: string; type: "company" | "streaming" | "label"; color: string }[] = [
   { name: "Good Deed Entertainment", type: "company", color: "#dc2626" },
   { name: "Cranked Up Films", type: "label", color: "#7c3aed" },
-  { name: "Streaming Service", type: "streaming", color: "#0ea5e9" },
+  { name: "Cranked Up TV", type: "streaming", color: "#0ea5e9" },
 ];
 
 // Idempotent: ensures the workspace has the default brand set.
