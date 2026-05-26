@@ -164,6 +164,12 @@ export async function backfillPostersFromTmdb(): Promise<{
   found: number;
 }> {
   const session = await requireSession();
+
+  if (!process.env.TMDB_API_KEY) {
+    throw new Error(
+      "TMDB_API_KEY is not set. Add it in Vercel → Settings → Environment Variables, then redeploy.",
+    );
+  }
   const rows = await db
     .select({
       id: movies.id,
