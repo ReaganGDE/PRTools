@@ -16,6 +16,28 @@ export type TMDBLookupResult =
   | { ok: true; posterUrl: string | null; matchedTitle: string | null }
   | { ok: false; error: string };
 
+// Strip parenthetical suffixes like " (Netflix 3/26 launch)" before searching.
+function cleanTitleForSearch(title: string): string {
+  return title.replace(/\s*\(.*?\)\s*/g, " ").trim();
+}
+
+// Fraction of search-title words that appear in the candidate title.
+// Returns 1.0 for an exact normalized match, 0.0 for completely unrelated.
+function titleWordCoverage(searchTitle: string, candidateTitle: string): number {
+  const words = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, "")
+      .trim()
+      .split(/\s+/)
+      .filter((w) => w.length > 0);
+  const sw = words(searchTitle);
+  const cw = new Set(words(candidateTitle));
+  if (sw.length === 0) return 0;
+  const matches = sw.filter((w) => cw.has(w)).length;
+  return matches / sw.length;
+}
+
 // Detailed version — returns ok/error so callers can surface API issues.
 export async function lookupMoviePoster(
   title: string,
@@ -25,10 +47,13 @@ export async function lookupMoviePoster(
   if (!key) return { ok: false, error: "TMDB_API_KEY not set" };
   if (!title.trim()) return { ok: true, posterUrl: null, matchedTitle: null };
 
+  // Strip parentheticals so "Caterpillar (Netflix 3/26 launch)" → "Caterpillar"
+  const searchTitle = cleanTitleForSearch(title);
+
   try {
     const url = new URL(`${API}/search/movie`);
     url.searchParams.set("api_key", key);
-    url.searchParams.set("query", title);
+    url.searchParams.set("query", searchTitle);
     url.searchParams.set("include_adult", "true");
     // Don't filter by year — TMDB indexes by theatrical year and we have TVOD year,
     // which often differs. We use year below as a soft tiebreaker instead.
@@ -52,22 +77,27 @@ export async function lookupMoviePoster(
     if (results.length === 0)
       return { ok: true, posterUrl: null, matchedTitle: null };
 
-    const target = title.toLowerCase().trim();
+    const target = searchTitle.toLowerCase().trim();
     const targetYear = year ?? null;
-    // Score: exact title match (+10), year match (+5), popularity (raw),
-    // require a poster.
+    // Score: exact title match (+10), year match (+5), popularity (raw).
+    // Only keep results with a poster AND sufficient title word overlap.
+    // Requiring >= 60% of the search words to appear in the candidate title
+    // prevents false matches like "Caterpillar" → Dutch film "Rups".
+    const MIN_COVERAGE = 0.6;
     const scored = results
       .map((r) => {
-        const exact = r.title?.toLowerCase().trim() === target ? 10 : 0;
+        const rTitle = r.title ?? "";
+        const exact = rTitle.toLowerCase().trim() === target ? 10 : 0;
         const yearOf = r.release_date
           ? parseInt(r.release_date.slice(0, 4), 10)
           : null;
         const yearMatch =
           targetYear && yearOf && Math.abs(yearOf - targetYear) <= 1 ? 5 : 0;
         const pop = r.popularity ?? 0;
-        return { r, score: exact + yearMatch + pop };
+        const coverage = titleWordCoverage(searchTitle, rTitle);
+        return { r, score: exact + yearMatch + pop, coverage };
       })
-      .filter((s) => s.r.poster_path)
+      .filter((s) => s.r.poster_path && s.coverage >= MIN_COVERAGE)
       .sort((a, b) => b.score - a.score);
 
     const pick = scored[0]?.r;
