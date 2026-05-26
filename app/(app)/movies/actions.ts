@@ -107,29 +107,51 @@ export type SyncResult = {
   error?: string;
 };
 
-// Find pairs of (manual movie, synced movie) with the same title in the same
-// workspace, re-point any social_posts.movie_id references, then delete the
-// manual duplicate. Safe to run repeatedly.
-async function dedupeManualMovies(workspaceId: string): Promise<number> {
+// Delete all duplicate movies in the workspace. For each group of movies
+// sharing the same lower-cased title, keep whichever row has an
+// airtable_record_id (preferring the most recently synced), or the oldest row
+// if all are manual. Re-points social_posts.movie_id before deleting.
+async function dedupeMovies(workspaceId: string): Promise<number> {
+  // Get all movies for the workspace, grouped conceptually by lower(title).
   const dupes = (await db.execute(sql`
-    SELECT manual.id AS manual_id, synced.id AS synced_id
-    FROM movies manual
-    JOIN movies synced
-      ON synced.workspace_id = manual.workspace_id
-     AND lower(synced.title) = lower(manual.title)
-     AND synced.airtable_record_id IS NOT NULL
-    WHERE manual.workspace_id = ${workspaceId}
-      AND manual.airtable_record_id IS NULL
-  `)) as unknown as { manual_id: string; synced_id: string }[];
-  let removed = 0;
+    SELECT id, lower(title) AS key,
+           airtable_record_id,
+           airtable_synced_at,
+           created_at
+    FROM movies
+    WHERE workspace_id = ${workspaceId}
+    ORDER BY lower(title),
+             (airtable_record_id IS NOT NULL) DESC,
+             airtable_synced_at DESC NULLS LAST,
+             created_at ASC
+  `)) as unknown as {
+    id: string;
+    key: string;
+    airtable_record_id: string | null;
+    airtable_synced_at: Date | null;
+    created_at: Date;
+  }[];
+
+  // Group by key; first entry in each group is the one we keep.
+  const groups = new Map<string, string[]>();
   for (const row of dupes) {
-    await db.execute(sql`
-      UPDATE social_posts
-      SET movie_id = ${row.synced_id}
-      WHERE movie_id = ${row.manual_id}
-    `);
-    await db.execute(sql`DELETE FROM movies WHERE id = ${row.manual_id}`);
-    removed++;
+    const list = groups.get(row.key) ?? [];
+    list.push(row.id);
+    groups.set(row.key, list);
+  }
+
+  let removed = 0;
+  for (const [, ids] of groups) {
+    if (ids.length <= 1) continue;
+    const [keepId, ...deleteIds] = ids;
+    for (const deleteId of deleteIds) {
+      // Re-point any social posts before deleting
+      await db.execute(sql`
+        UPDATE social_posts SET movie_id = ${keepId} WHERE movie_id = ${deleteId}
+      `);
+      await db.execute(sql`DELETE FROM movies WHERE id = ${deleteId}`);
+      removed++;
+    }
   }
   return removed;
 }
@@ -326,9 +348,8 @@ export async function syncMoviesFromAirtable(): Promise<{
     results.push(result);
   }
 
-  // After upserting, sweep any pre-existing manual duplicates that the sync
-  // didn't absorb (e.g. titles spelled slightly differently before).
-  await dedupeManualMovies(session.workspaceId);
+  // Sweep all duplicates (same title, any combination of manual/synced).
+  await dedupeMovies(session.workspaceId);
 
   revalidatePath("/movies");
   return { results, total: { inserted: totalInserted, updated: totalUpdated } };
