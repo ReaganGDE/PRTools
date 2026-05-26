@@ -30,7 +30,8 @@ export async function lookupMoviePoster(
     url.searchParams.set("api_key", key);
     url.searchParams.set("query", title);
     url.searchParams.set("include_adult", "true");
-    if (year) url.searchParams.set("year", String(year));
+    // Don't filter by year — TMDB indexes by theatrical year and we have TVOD year,
+    // which often differs. We use year below as a soft tiebreaker instead.
 
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) {
@@ -52,10 +53,26 @@ export async function lookupMoviePoster(
       return { ok: true, posterUrl: null, matchedTitle: null };
 
     const target = title.toLowerCase().trim();
-    const exact = results.find((r) => r.title?.toLowerCase().trim() === target);
-    const pick = exact ?? results[0];
-    if (!pick.poster_path)
-      return { ok: true, posterUrl: null, matchedTitle: pick.title };
+    const targetYear = year ?? null;
+    // Score: exact title match (+10), year match (+5), popularity (raw),
+    // require a poster.
+    const scored = results
+      .map((r) => {
+        const exact = r.title?.toLowerCase().trim() === target ? 10 : 0;
+        const yearOf = r.release_date
+          ? parseInt(r.release_date.slice(0, 4), 10)
+          : null;
+        const yearMatch =
+          targetYear && yearOf && Math.abs(yearOf - targetYear) <= 1 ? 5 : 0;
+        const pop = r.popularity ?? 0;
+        return { r, score: exact + yearMatch + pop };
+      })
+      .filter((s) => s.r.poster_path)
+      .sort((a, b) => b.score - a.score);
+
+    const pick = scored[0]?.r;
+    if (!pick?.poster_path)
+      return { ok: true, posterUrl: null, matchedTitle: null };
     return {
       ok: true,
       posterUrl: `${IMG}${pick.poster_path}`,
