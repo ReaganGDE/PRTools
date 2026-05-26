@@ -175,11 +175,14 @@ export async function backfillPostersFromTmdb(): Promise<{
   }
   // Scan all movies — overwrite any poster with a TMDB one (TMDB URLs are
   // permanent; Airtable attachment URLs expire after hours/days).
+  const TMDB_CDN = "https://image.tmdb.org";
   const rows = await db
     .select({
       id: movies.id,
       title: movies.title,
       releaseDate: movies.releaseDate,
+      posterUrl: movies.posterUrl,
+      posterAirtableUrl: movies.posterAirtableUrl,
     })
     .from(movies)
     .where(eq(movies.workspaceId, session.workspaceId));
@@ -214,6 +217,13 @@ export async function backfillPostersFromTmdb(): Promise<{
         .where(eq(movies.id, row.id));
       matched.push(`${row.title} → ${r.matchedTitle ?? "?"}`);
       found++;
+    } else if (row.posterUrl?.startsWith(TMDB_CDN)) {
+      // TMDB no longer matches this title — the stored URL was a false positive.
+      // Fall back to the Airtable attachment URL (may be expired) or clear it.
+      await db
+        .update(movies)
+        .set({ posterUrl: row.posterAirtableUrl ?? null })
+        .where(eq(movies.id, row.id));
     }
   }
   revalidatePath("/movies");
