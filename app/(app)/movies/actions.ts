@@ -173,6 +173,8 @@ export async function backfillPostersFromTmdb(): Promise<{
       "TMDB_API_KEY is not set. Add it in Vercel → Settings → Environment Variables, then redeploy.",
     );
   }
+  // Scan all movies — overwrite any poster with a TMDB one (TMDB URLs are
+  // permanent; Airtable attachment URLs expire after hours/days).
   const rows = await db
     .select({
       id: movies.id,
@@ -180,12 +182,7 @@ export async function backfillPostersFromTmdb(): Promise<{
       releaseDate: movies.releaseDate,
     })
     .from(movies)
-    .where(
-      and(
-        eq(movies.workspaceId, session.workspaceId),
-        sql`${movies.posterUrl} IS NULL`,
-      ),
-    );
+    .where(eq(movies.workspaceId, session.workspaceId));
 
   let found = 0;
   let apiErrors = 0;
@@ -310,17 +307,18 @@ export async function syncMoviesFromAirtable(): Promise<{
         // TVOD Date is the canonical release date for our workflow.
         const releaseDate = tvodDate ?? theatricalDate ?? avodDate ?? null;
 
-        let posterUrl = pickPosterUrl(
+        // Airtable attachment URLs expire (signed links) so use TMDB as primary
+        // and keep the Airtable URL as a fallback / reference.
+        const posterAirtableUrl = pickPosterUrl(
           readAttachments(f, "Stills & Press Materials") ??
             readAttachments(f, "Attachments"),
         );
-        // Fall back to TMDB if Airtable doesn't have a poster for this title.
-        if (!posterUrl) {
-          posterUrl = await searchMoviePoster(
-            title,
-            releaseDate?.getFullYear() ?? null,
-          );
-        }
+        const tmdbPosterUrl = await searchMoviePoster(
+          title,
+          releaseDate?.getFullYear() ?? null,
+        );
+        // Prefer TMDB (permanent CDN URL) over Airtable (expiring signed URL)
+        const posterUrl = tmdbPosterUrl ?? posterAirtableUrl;
 
         // Infer status from release date so synced films aren't all "in_production"
         const today = new Date();
@@ -370,6 +368,7 @@ export async function syncMoviesFromAirtable(): Promise<{
           producer: readString(f, "Producer(s)") ?? readString(f, "Producer"),
           copyrightLine: readString(f, "Copyright Line"),
           posterUrl,
+          posterAirtableUrl,
           airtableRecordId: rec.id,
           airtableSyncedAt: new Date(),
         };

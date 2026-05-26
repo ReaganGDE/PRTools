@@ -263,6 +263,7 @@ export const movies = pgTable(
     tagline: text("tagline"),
     compTitles: text("comp_titles"),
     posterUrl: text("poster_url"),
+    posterAirtableUrl: text("poster_airtable_url"),
     trailerUrl: text("trailer_url"),
     trailerPassword: text("trailer_password"),
     screenerUrl: text("screener_url"),
