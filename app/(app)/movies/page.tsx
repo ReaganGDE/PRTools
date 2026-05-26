@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { eq, desc, and } from "drizzle-orm";
-import { Plus, Film, Calendar } from "lucide-react";
+import { Plus, Film, Calendar, LayoutGrid, List } from "lucide-react";
 import { db } from "@/lib/db";
 import { movies, brands, workspaces } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
@@ -11,9 +11,17 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SyncFromAirtableButton } from "./sync-button";
 
-export default async function MoviesPage() {
+type View = "grid" | "list";
+
+export default async function MoviesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
   const session = await requireSession();
   const activeBrandId = await getActiveBrandId();
+  const sp = await searchParams;
+  const view: View = sp.view === "list" ? "list" : "grid";
 
   const where = activeBrandId
     ? and(eq(movies.workspaceId, session.workspaceId), eq(movies.brandId, activeBrandId))
@@ -50,6 +58,7 @@ export default async function MoviesPage() {
         description="Film projects and release campaigns."
         actions={
           <div className="flex items-center gap-2">
+            <ViewToggle current={view} />
             {airtableReady && <SyncFromAirtableButton />}
             <Button asChild>
               <Link href="/movies/new">
@@ -62,8 +71,8 @@ export default async function MoviesPage() {
       <div className="p-8">
         {rows.length === 0 ? (
           <EmptyState hasBrands={brandList.length > 0} />
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        ) : view === "grid" ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {rows.map((r) => (
               <MovieCard
                 key={r.movie.id}
@@ -73,9 +82,169 @@ export default async function MoviesPage() {
               />
             ))}
           </div>
+        ) : (
+          <MoviesListView rows={rows} />
         )}
       </div>
     </>
+  );
+}
+
+function ViewToggle({ current }: { current: View }) {
+  const base =
+    "flex h-9 items-center gap-1.5 border border-zinc-200 px-3 text-sm font-medium transition-colors dark:border-zinc-800";
+  return (
+    <div className="flex overflow-hidden rounded-lg">
+      <Link
+        href="/movies?view=grid"
+        className={cn(
+          base,
+          "rounded-l-lg border-r-0",
+          current === "grid"
+            ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+            : "bg-white hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800",
+        )}
+      >
+        <LayoutGrid className="h-3.5 w-3.5" /> Grid
+      </Link>
+      <Link
+        href="/movies?view=list"
+        className={cn(
+          base,
+          "rounded-r-lg",
+          current === "list"
+            ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+            : "bg-white hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800",
+        )}
+      >
+        <List className="h-3.5 w-3.5" /> List
+      </Link>
+    </div>
+  );
+}
+
+function MoviesListView({
+  rows,
+}: {
+  rows: {
+    movie: typeof movies.$inferSelect;
+    brandName: string | null;
+    brandColor: string | null;
+  }[];
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900">
+      <table className="w-full text-sm">
+        <thead className="border-b border-zinc-200 bg-zinc-50/50 text-left text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/40">
+          <tr>
+            <th className="w-12 px-3 py-2.5"></th>
+            <th className="px-3 py-2.5 font-semibold">Title</th>
+            <th className="px-3 py-2.5 font-semibold">Brand</th>
+            <th className="px-3 py-2.5 font-semibold">Studio</th>
+            <th className="px-3 py-2.5 font-semibold">Genre</th>
+            <th className="px-3 py-2.5 font-semibold">Director</th>
+            <th className="px-3 py-2.5 font-semibold">Runtime</th>
+            <th className="px-3 py-2.5 font-semibold">Rights</th>
+            <th className="px-3 py-2.5 font-semibold">Release</th>
+            <th className="px-3 py-2.5 font-semibold">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr
+              key={r.movie.id}
+              className="group border-b border-zinc-100 last:border-0 hover:bg-zinc-50/60 dark:border-zinc-800/40 dark:hover:bg-zinc-800/30"
+            >
+              <td className="px-3 py-2">
+                <Link
+                  href={`/movies/${r.movie.id}`}
+                  className="relative block aspect-[2/3] w-9 overflow-hidden rounded bg-zinc-100 dark:bg-zinc-800"
+                >
+                  {r.movie.posterUrl ? (
+                    <Image
+                      src={r.movie.posterUrl}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <Film className="absolute inset-0 m-auto h-3.5 w-3.5 text-zinc-400" />
+                  )}
+                </Link>
+              </td>
+              <td className="px-3 py-2">
+                <Link
+                  href={`/movies/${r.movie.id}`}
+                  className="font-medium hover:underline"
+                >
+                  {r.movie.title}
+                </Link>
+                {r.movie.tagline && (
+                  <p className="truncate text-xs text-zinc-500">
+                    {r.movie.tagline}
+                  </p>
+                )}
+              </td>
+              <td className="px-3 py-2">
+                {r.brandName && (
+                  <span className="inline-flex items-center gap-1.5 text-xs">
+                    {r.brandColor && (
+                      <span
+                        className="h-2 w-2 rounded-sm"
+                        style={{ backgroundColor: r.brandColor }}
+                      />
+                    )}
+                    {r.brandName}
+                  </span>
+                )}
+              </td>
+              <td className="px-3 py-2 text-zinc-500">
+                {r.movie.studio ?? "—"}
+              </td>
+              <td className="px-3 py-2">
+                <div className="flex flex-wrap gap-1">
+                  {r.movie.genres.slice(0, 2).map((g) => (
+                    <span
+                      key={g}
+                      className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] dark:bg-zinc-800"
+                    >
+                      {g}
+                    </span>
+                  ))}
+                  {r.movie.genres.length > 2 && (
+                    <span className="text-[10px] text-zinc-400">
+                      +{r.movie.genres.length - 2}
+                    </span>
+                  )}
+                </div>
+              </td>
+              <td className="px-3 py-2 text-zinc-500">
+                {r.movie.director ?? "—"}
+              </td>
+              <td className="px-3 py-2 tabular-nums text-zinc-500">
+                {r.movie.runtime ? `${r.movie.runtime}m` : "—"}
+              </td>
+              <td className="px-3 py-2 text-zinc-500">
+                {r.movie.rights ?? "—"}
+              </td>
+              <td className="px-3 py-2 text-xs text-zinc-500">
+                {r.movie.releaseDate
+                  ? r.movie.releaseDate.toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "—"}
+              </td>
+              <td className="px-3 py-2">
+                <StatusPill status={r.movie.status} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -137,13 +306,11 @@ function MovieCard({
               })}
             </span>
           )}
+          {movie.runtime && <span>{movie.runtime}m</span>}
           {movie.mpaaRating && (
             <span className="rounded border border-zinc-200 px-1 text-[10px] font-semibold dark:border-zinc-700">
               {movie.mpaaRating}
             </span>
-          )}
-          {!movie.manageSocials && (
-            <span className="text-[10px] italic">socials not managed</span>
           )}
         </div>
       </div>
@@ -165,6 +332,28 @@ function StatusBadge({ status }: { status: string }) {
     <span
       className={cn(
         "absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
+        cls,
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function StatusPill({ status }: { status: string }) {
+  const label = status.replace("_", " ");
+  const cls =
+    status === "released"
+      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+      : status === "pre_release"
+        ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+        : status === "archived"
+          ? "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+          : "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300";
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
         cls,
       )}
     >

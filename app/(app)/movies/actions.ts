@@ -10,6 +10,8 @@ import {
   pickPosterUrl,
   readAttachments,
   readDate,
+  readMultiSelect,
+  readNumber,
   readString,
 } from "@/lib/integrations/airtable";
 
@@ -132,23 +134,36 @@ export async function syncMoviesFromAirtable(): Promise<{
     );
   }
 
+  // Build a lookup: normalized brand name → brand row. Used to route a record
+  // to the right brand based on the Studio field (since one Sell Sheets table
+  // contains films for multiple brands).
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const brandByName = new Map<string, (typeof brandRows)[number]>();
+  for (const b of brandRows) brandByName.set(norm(b.name), b);
+
+  // Dedupe tables — both brands may point to the same Sell Sheets table.
+  const tableToBrands = new Map<string, typeof mapped>();
+  for (const b of mapped) {
+    const list = tableToBrands.get(b.airtableTableId!) ?? [];
+    list.push(b);
+    tableToBrands.set(b.airtableTableId!, list);
+  }
+
   const results: SyncResult[] = [];
   let totalInserted = 0;
   let totalUpdated = 0;
 
-  for (const brand of mapped) {
+  for (const [tableId, brandsForTable] of tableToBrands) {
+    const tableLabel = brandsForTable.map((b) => b.name).join(" + ");
     const result: SyncResult = {
-      brand: brand.name,
+      brand: tableLabel,
       inserted: 0,
       updated: 0,
       skipped: 0,
     };
     try {
-      const records = await fetchAllRecords(
-        ws.token,
-        ws.baseId,
-        brand.airtableTableId!,
-      );
+      const records = await fetchAllRecords(ws.token, ws.baseId, tableId);
 
       for (const rec of records) {
         const f = rec.fields;
@@ -158,12 +173,16 @@ export async function syncMoviesFromAirtable(): Promise<{
           continue;
         }
 
-        // Release date: prefer Theatrical, then TVOD, then CUTV
-        const releaseDate =
-          readDate(f, "Theatrical Date") ??
-          readDate(f, "TVOD Date") ??
-          readDate(f, "CUTV Date") ??
-          null;
+        // Route to brand by matching Studio name; fall back to first brand
+        // mapped to this table if no match.
+        const studio = readString(f, "Studio");
+        const studioBrand = studio ? brandByName.get(norm(studio)) : undefined;
+        const brandForRecord = studioBrand ?? brandsForTable[0];
+
+        const theatricalDate = readDate(f, "Theatrical Date");
+        const tvodDate = readDate(f, "TVOD Date");
+        const avodDate = readDate(f, "AVOD Date") ?? readDate(f, "CUTV Date");
+        const releaseDate = theatricalDate ?? tvodDate ?? avodDate ?? null;
 
         const posterUrl = pickPosterUrl(
           readAttachments(f, "Stills & Press Materials") ??
@@ -172,25 +191,44 @@ export async function syncMoviesFromAirtable(): Promise<{
 
         const values = {
           workspaceId: session.workspaceId,
-          brandId: brand.id,
+          brandId: brandForRecord.id,
           title,
           releaseDate,
+          theatricalDate,
+          tvodDate,
+          avodDate,
           synopsis: readString(f, "Synopsis"),
           logline: readString(f, "Logline"),
           tagline: readString(f, "Tagline"),
-          mpaaRating: readString(f, "Suggested Rating") ?? readString(f, "MPAA Rating"),
+          studio,
+          productionCompany: readString(f, "Production Company"),
+          distributor: readString(f, "Distributor"),
+          mpaaRating:
+            readString(f, "Suggested Rating") ?? readString(f, "MPAA Rating"),
+          runtime: readNumber(f, "Runtime"),
+          language: readString(f, "Language"),
+          territory: readString(f, "Territory") ?? readString(f, "Territories"),
+          rights: readString(f, "Rights"),
+          genres: readMultiSelect(f, "Genre"),
+          compTitles: readString(f, "Comp Titles"),
           trailerUrl: readString(f, "Trailer Link"),
+          trailerPassword: readString(f, "Trailer Password"),
+          screenerUrl: readString(f, "Screener Link"),
+          screenerPassword: readString(f, "Screener Password"),
           imdbUrl: readString(f, "IMDB Link"),
+          websiteUrl: readString(f, "Website"),
+          pressKitUrl: readString(f, "Press Kit Link"),
+          socialMediaUrl: readString(f, "Social Media"),
           director: readString(f, "Director(s)") ?? readString(f, "Director"),
+          writer: readString(f, "Writer(s)") ?? readString(f, "Writer"),
           castList: readString(f, "Cast"),
           producer: readString(f, "Producer(s)") ?? readString(f, "Producer"),
-          distributor: readString(f, "Production Company") ?? readString(f, "Distributor"),
+          copyrightLine: readString(f, "Copyright Line"),
           posterUrl,
           airtableRecordId: rec.id,
           airtableSyncedAt: new Date(),
         };
 
-        // Upsert by (workspace_id, airtable_record_id)
         const existing = await db
           .select({ id: movies.id })
           .from(movies)
@@ -202,7 +240,10 @@ export async function syncMoviesFromAirtable(): Promise<{
           );
 
         if (existing.length > 0) {
-          await db.update(movies).set(values).where(eq(movies.id, existing[0].id));
+          await db
+            .update(movies)
+            .set(values)
+            .where(eq(movies.id, existing[0].id));
           result.updated++;
         } else {
           await db.insert(movies).values(values);
@@ -210,10 +251,13 @@ export async function syncMoviesFromAirtable(): Promise<{
         }
       }
 
-      await db
-        .update(brands)
-        .set({ airtableLastSyncedAt: new Date() })
-        .where(eq(brands.id, brand.id));
+      const now = new Date();
+      for (const b of brandsForTable) {
+        await db
+          .update(brands)
+          .set({ airtableLastSyncedAt: now })
+          .where(eq(brands.id, b.id));
+      }
 
       totalInserted += result.inserted;
       totalUpdated += result.updated;

@@ -130,3 +130,32 @@ export function readAttachments(
   const v = fields[name];
   return Array.isArray(v) ? (v as AirtableAttachment[]) : undefined;
 }
+
+// Multi-select returns an array of strings (e.g. ["Horror", "Sci-Fi"]).
+// Returns [] if missing so it can be assigned to a NOT NULL text[] column.
+export function readMultiSelect(
+  fields: Record<string, unknown>,
+  name: string,
+): string[] {
+  const v = fields[name];
+  if (Array.isArray(v)) {
+    return v
+      .map((x) => (typeof x === "string" ? x.trim() : ""))
+      .filter((s) => s.length > 0);
+  }
+  if (typeof v === "string" && v.trim()) return [v.trim()];
+  return [];
+}
+
+export function readNumber(
+  fields: Record<string, unknown>,
+  name: string,
+): number | null {
+  const v = fields[name];
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = parseInt(v.replace(/[^\d.-]/g, ""), 10);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
