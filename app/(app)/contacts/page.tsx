@@ -10,6 +10,7 @@ import { requireSession } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ContactsTable } from "./contacts-table";
 
 const PAGE_SIZE = 100;
 
@@ -178,7 +179,7 @@ export default async function ContactsPage({
         </form>
 
         {rows.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-zinc-300 p-12 text-center dark:border-zinc-700">
+          <div className="rounded-xl border border-dashed border-zinc-300 p-12 text-center dark:border-zinc-700">
             <p className="text-sm text-zinc-500">
               {q || type || tag || listId
                 ? "No contacts match those filters."
@@ -186,78 +187,24 @@ export default async function ContactsPage({
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-            <table className="w-full text-sm">
-              <thead className="border-b border-zinc-200 bg-zinc-50 text-left dark:border-zinc-800 dark:bg-zinc-900">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Name</th>
-                  <th className="px-4 py-2 font-medium">Type</th>
-                  <th className="px-4 py-2 font-medium">Email</th>
-                  <th className="px-4 py-2 font-medium">Outlet</th>
-                  <th className="px-4 py-2 font-medium">Handles</th>
-                  <th className="px-4 py-2 font-medium">Followers</th>
-                  <th className="px-4 py-2 font-medium">Tags</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((c) => (
-                  <tr
-                    key={c.id}
-                    className="border-b border-zinc-100 last:border-0 dark:border-zinc-900"
-                  >
-                    <td className="px-4 py-2">
-                      <Link
-                        href={`/contacts/${c.id}`}
-                        className="hover:underline"
-                      >
-                        {c.name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-2 text-zinc-500">{c.type}</td>
-                    <td className="px-4 py-2 text-zinc-500">{c.email ?? "—"}</td>
-                    <td className="px-4 py-2 text-zinc-500">{c.outlet ?? "—"}</td>
-                    <td className="px-4 py-2 text-xs text-zinc-500">
-                      {[
-                        c.handleInstagram && `IG:${c.handleInstagram}`,
-                        c.handleTiktok && `TT:${c.handleTiktok}`,
-                        c.handleReddit && `R:${c.handleReddit}`,
-                        c.handleYoutube && `YT:${c.handleYoutube}`,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "—"}
-                    </td>
-                    <td className="px-4 py-2 text-zinc-500">
-                      {c.followerCount?.toLocaleString() ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 text-xs">
-                      {c.tags.length === 0 ? (
-                        "—"
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {c.tags.slice(0, 3).map((t) => (
-                            <span
-                              key={t}
-                              className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                            >
-                              {t}
-                            </span>
-                          ))}
-                          {c.tags.length > 3 ? (
-                            <span className="text-zinc-400">
-                              +{c.tags.length - 3}
-                            </span>
-                          ) : null}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="px-4 py-2 text-xs text-zinc-500">
-              Showing {rows.length} of {PAGE_SIZE} max per page.
-            </div>
-          </div>
+          <ContactsTable
+            rows={rows.map((c) => ({
+              id: c.id,
+              name: c.name,
+              type: c.type,
+              email: c.email,
+              outlet: c.outlet,
+              handleInstagram: c.handleInstagram,
+              handleTiktok: c.handleTiktok,
+              handleReddit: c.handleReddit,
+              handleYoutube: c.handleYoutube,
+              followerCount: c.followerCount,
+              tags: c.tags,
+            }))}
+            lists={lists}
+            totalShown={rows.length}
+            pageSize={PAGE_SIZE}
+          />
         )}
       </div>
     </>

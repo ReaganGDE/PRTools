@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ContactForm } from "@/components/contact-form";
 import { updateContact, deleteContact } from "../actions";
+import { ListMembership } from "./list-membership";
 import {
   Card,
   CardContent,
@@ -80,6 +81,13 @@ export default async function ContactDetailPage({
     .innerJoin(contactLists, eq(contactListMembers.listId, contactLists.id))
     .where(eq(contactListMembers.contactId, id));
 
+  // All lists in the workspace (for the picker)
+  const allLists = await db
+    .select({ id: contactLists.id, name: contactLists.name })
+    .from(contactLists)
+    .where(eq(contactLists.workspaceId, session.workspaceId))
+    .orderBy(contactLists.name);
+
   const boundUpdate = updateContact.bind(null, contact.id);
   const boundDelete = deleteContact.bind(null, contact.id);
 
@@ -116,22 +124,11 @@ export default async function ContactDetailPage({
               <CardDescription>Segments this contact is in.</CardDescription>
             </CardHeader>
             <CardContent>
-              {lists.length === 0 ? (
-                <p className="text-sm text-zinc-500">Not in any list.</p>
-              ) : (
-                <ul className="space-y-1 text-sm">
-                  {lists.map((l) => (
-                    <li key={l.id}>
-                      <Link
-                        href={`/contacts?list=${l.id}`}
-                        className="hover:underline"
-                      >
-                        {l.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <ListMembership
+                contactId={contact.id}
+                contactLists={lists}
+                allLists={allLists}
+              />
             </CardContent>
           </Card>
 

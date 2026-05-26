@@ -73,23 +73,28 @@ export default async function ListsPage() {
               <p className="text-sm text-zinc-500">No lists yet.</p>
             </div>
           ) : (
-            <ul className="divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950">
+            <ul className="space-y-2">
               {lists.map((l) => (
-                <li key={l.id} className="flex items-center justify-between p-4">
-                  <div>
-                    <Link
-                      href={`/contacts?list=${l.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {l.name}
-                    </Link>
-                    {l.description ? (
-                      <p className="text-xs text-zinc-500">{l.description}</p>
-                    ) : null}
-                  </div>
-                  <span className="text-sm text-zinc-500">
-                    {l.memberCount} contacts
-                  </span>
+                <li key={l.id}>
+                  <Link
+                    href={`/contacts/lists/${l.id}`}
+                    className="group flex items-center justify-between rounded-xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-zinc-800/60 dark:bg-zinc-900"
+                  >
+                    <div>
+                      <div className="font-medium tracking-tight">{l.name}</div>
+                      {l.description ? (
+                        <p className="text-xs text-zinc-500">{l.description}</p>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium tabular-nums dark:bg-zinc-800">
+                        {l.memberCount}
+                      </span>
+                      <span className="text-xs text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100">
+                        Manage →
+                      </span>
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>

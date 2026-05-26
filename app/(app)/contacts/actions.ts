@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { contacts, contactLists, contactListMembers } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
@@ -293,13 +293,17 @@ export async function importCsv(args: {
 
 /* ────────────────────── Contact lists ────────────────────── */
 
-export async function createList(name: string) {
+export async function createList(name: string, description?: string) {
   const session = await requireSessionWithCap("lists.create");
   const trimmed = name.trim();
   if (!trimmed) return { ok: false as const, error: "Name required" };
   const [row] = await db
     .insert(contactLists)
-    .values({ workspaceId: session.workspaceId, name: trimmed })
+    .values({
+      workspaceId: session.workspaceId,
+      name: trimmed,
+      description: description?.trim() || null,
+    })
     .returning({ id: contactLists.id });
   await logAudit({
     workspaceId: session.workspaceId,
@@ -310,32 +314,102 @@ export async function createList(name: string) {
     meta: { name: trimmed },
   });
   revalidatePath("/contacts");
+  revalidatePath("/contacts/lists");
   return { ok: true as const, id: row.id };
 }
 
-export async function addContactToList(contactId: string, listId: string) {
-  await requireSessionWithCap("lists.edit");
-  await db
-    .insert(contactListMembers)
-    .values({ contactId, listId })
-    .onConflictDoNothing();
-  revalidatePath(`/contacts/${contactId}`);
+// Verify list belongs to the caller's workspace before mutating membership.
+async function assertListOwned(listId: string, workspaceId: string) {
+  const [row] = await db
+    .select({ id: contactLists.id })
+    .from(contactLists)
+    .where(
+      and(eq(contactLists.id, listId), eq(contactLists.workspaceId, workspaceId)),
+    );
+  if (!row) throw new Error("List not found");
 }
 
-export async function removeContactFromList(
-  contactId: string,
+export async function addContactsToList(
   listId: string,
-) {
-  await requireSessionWithCap("lists.edit");
+  contactIds: string[],
+): Promise<{ added: number; skipped: number }> {
+  const session = await requireSessionWithCap("lists.edit");
+  if (contactIds.length === 0) return { added: 0, skipped: 0 };
+  await assertListOwned(listId, session.workspaceId);
+
+  // Filter to contacts in this workspace so we never insert cross-workspace.
+  const owned = await db
+    .select({ id: contacts.id })
+    .from(contacts)
+    .where(
+      and(
+        inArray(contacts.id, contactIds),
+        eq(contacts.workspaceId, session.workspaceId),
+      ),
+    );
+  if (owned.length === 0) return { added: 0, skipped: contactIds.length };
+
+  // ON CONFLICT DO NOTHING so re-adding existing members doesn't error.
+  const inserted = await db
+    .insert(contactListMembers)
+    .values(owned.map((c) => ({ listId, contactId: c.id })))
+    .onConflictDoNothing()
+    .returning({ contactId: contactListMembers.contactId });
+
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "list.create",
+    targetType: "list",
+    targetId: listId,
+    meta: { added: inserted.length, requested: contactIds.length },
+  });
+
+  revalidatePath("/contacts");
+  revalidatePath("/contacts/lists");
+  revalidatePath(`/contacts/lists/${listId}`);
+  for (const c of owned) revalidatePath(`/contacts/${c.id}`);
+
+  return { added: inserted.length, skipped: contactIds.length - inserted.length };
+}
+
+export async function removeContactFromList(listId: string, contactId: string) {
+  const session = await requireSessionWithCap("lists.edit");
+  await assertListOwned(listId, session.workspaceId);
   await db
     .delete(contactListMembers)
     .where(
       and(
-        eq(contactListMembers.contactId, contactId),
         eq(contactListMembers.listId, listId),
+        eq(contactListMembers.contactId, contactId),
       ),
     );
+  revalidatePath("/contacts");
+  revalidatePath("/contacts/lists");
+  revalidatePath(`/contacts/lists/${listId}`);
   revalidatePath(`/contacts/${contactId}`);
+}
+
+export async function renameList(listId: string, name: string, description?: string) {
+  const session = await requireSessionWithCap("lists.edit");
+  await assertListOwned(listId, session.workspaceId);
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Name required");
+  await db
+    .update(contactLists)
+    .set({ name: trimmed, description: description?.trim() || null })
+    .where(eq(contactLists.id, listId));
+  revalidatePath("/contacts/lists");
+  revalidatePath(`/contacts/lists/${listId}`);
+}
+
+export async function deleteList(listId: string) {
+  const session = await requireSessionWithCap("lists.edit");
+  await assertListOwned(listId, session.workspaceId);
+  // Cascade deletes members via FK
+  await db.delete(contactLists).where(eq(contactLists.id, listId));
+  revalidatePath("/contacts");
+  revalidatePath("/contacts/lists");
 }
 
 export async function bulkTag(contactIds: string[], tags: string[]) {
