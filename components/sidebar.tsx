@@ -18,17 +18,23 @@ import {
 import { cn } from "@/lib/utils";
 import { BrandSwitcher, type BrandOption } from "@/components/brand-switcher";
 
+type ToolSection = "pr" | "social" | null;
+
 const NAV_GROUPS: {
   label: string | null;
+  section: ToolSection;
   items: { href: string; label: string; icon: typeof Home }[];
 }[] = [
   {
     label: null,
+    section: null,
     items: [{ href: "/dashboard", label: "Dashboard", icon: Home }],
   },
   {
-    label: "Engage",
+    label: "PR Tools",
+    section: "pr",
     items: [
+      { href: "/movies", label: "Movies", icon: Film },
       { href: "/contacts", label: "Contacts", icon: Users },
       { href: "/outreach", label: "Outreach", icon: Send },
       { href: "/email", label: "Email", icon: Mail },
@@ -36,33 +42,46 @@ const NAV_GROUPS: {
     ],
   },
   {
-    label: "Publish",
+    label: "Social Media",
+    section: "social",
     items: [
       { href: "/social", label: "Social", icon: Megaphone },
       { href: "/sentiment", label: "Sentiment", icon: BarChart3 },
     ],
   },
   {
-    label: "Catalog",
-    items: [{ href: "/movies", label: "Movies", icon: Film }],
-  },
-  {
     label: null,
+    section: null,
     items: [{ href: "/settings", label: "Settings", icon: Settings }],
   },
 ];
 
+type ToolAccess = "all" | "pr_only" | "social_only";
+
+function sectionVisible(section: ToolSection, toolAccess: ToolAccess): boolean {
+  if (section === null) return true;
+  if (toolAccess === "all") return true;
+  if (toolAccess === "pr_only") return section === "pr";
+  if (toolAccess === "social_only") return section === "social";
+  return true;
+}
+
 export function Sidebar({
   user,
+  role: _role,
+  toolAccess,
   brands,
   activeBrandId,
 }: {
   user: { email?: string | null; name?: string | null };
+  role: string;
+  toolAccess: ToolAccess;
   brands: BrandOption[];
   activeBrandId: string | null;
 }) {
   const pathname = usePathname();
   const [, startTransition] = useTransition();
+  void startTransition;
 
   const initials = (user.name ?? user.email ?? "?")
     .split(/[\s@.]/)
@@ -70,6 +89,10 @@ export function Sidebar({
     .slice(0, 2)
     .map((s) => s[0]?.toUpperCase())
     .join("");
+
+  const visibleGroups = NAV_GROUPS.filter((g) =>
+    sectionVisible(g.section, toolAccess),
+  );
 
   return (
     <aside
@@ -98,7 +121,7 @@ export function Sidebar({
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-5">
-        {NAV_GROUPS.map((group, gi) => (
+        {visibleGroups.map((group, gi) => (
           <div key={gi}>
             {group.label ? (
               <div className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">

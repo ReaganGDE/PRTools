@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
 import { Sidebar } from "@/components/sidebar";
 import {
   ensureDefaultBrands,
@@ -20,15 +23,24 @@ export default async function AppLayout({
   }
 
   await ensureDefaultBrands(session.user.workspaceId);
-  const [brands, activeBrandId] = await Promise.all([
+  const [brands, activeBrandId, userRow] = await Promise.all([
     getBrandsForWorkspace(session.user.workspaceId),
     getActiveBrandId(),
+    session.user.id
+      ? db
+          .select({ role: users.role, toolAccess: users.toolAccess })
+          .from(users)
+          .where(eq(users.id, session.user.id))
+          .then((r) => r[0])
+      : Promise.resolve(undefined),
   ]);
 
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
         user={{ email: session.user.email, name: session.user.name }}
+        role={userRow?.role ?? "member"}
+        toolAccess={userRow?.toolAccess ?? "all"}
         brands={brands.map((b) => ({
           id: b.id,
           name: b.name,

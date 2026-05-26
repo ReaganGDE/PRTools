@@ -25,6 +25,7 @@ import {
   sendInvite,
   revokePendingInvite,
   changeRole,
+  changeToolAccess,
   removeMember,
   transferOwnership,
 } from "./actions";
@@ -39,6 +40,7 @@ export default async function TeamPage() {
       email: users.email,
       name: users.name,
       role: users.role,
+      toolAccess: users.toolAccess,
     })
     .from(users)
     .where(eq(users.workspaceId, wsId))
@@ -92,7 +94,7 @@ export default async function TeamPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {/* Role display / edit */}
                       {canChangeRole && !isOwner && !isSelf ? (
                         <form
@@ -114,6 +116,29 @@ export default async function TeamPage() {
                         </form>
                       ) : (
                         <RoleBadge role={m.role} />
+                      )}
+
+                      {/* Tool access */}
+                      {canChangeRole && !isOwner && !isSelf ? (
+                        <form
+                          action={changeToolAccess.bind(null, m.id)}
+                          className="flex items-center gap-1"
+                        >
+                          <select
+                            name="toolAccess"
+                            defaultValue={m.toolAccess}
+                            className="h-7 rounded-md border border-zinc-200 bg-white px-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+                          >
+                            <option value="all">All tools</option>
+                            <option value="pr_only">PR only</option>
+                            <option value="social_only">Social only</option>
+                          </select>
+                          <Button type="submit" size="sm" variant="outline">
+                            Save
+                          </Button>
+                        </form>
+                      ) : (
+                        <ToolAccessBadge access={m.toolAccess} />
                       )}
 
                       {/* Transfer ownership */}
@@ -183,6 +208,19 @@ export default async function TeamPage() {
                     <option value="admin">Admin</option>
                     <option value="member">Member</option>
                     <option value="viewer">Viewer</option>
+                  </select>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="invite-tool-access">Tool access</Label>
+                  <select
+                    id="invite-tool-access"
+                    name="toolAccess"
+                    defaultValue="all"
+                    className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                  >
+                    <option value="all">All tools</option>
+                    <option value="pr_only">PR only</option>
+                    <option value="social_only">Social only</option>
                   </select>
                 </div>
                 <Button type="submit">Send invite</Button>
@@ -296,6 +334,24 @@ export default async function TeamPage() {
         </Card>
       </div>
     </>
+  );
+}
+
+type ToolAccess = "all" | "pr_only" | "social_only";
+
+function ToolAccessBadge({ access }: { access: ToolAccess }) {
+  const label =
+    access === "pr_only" ? "PR only" : access === "social_only" ? "Social only" : "All tools";
+  const cls =
+    access === "pr_only"
+      ? "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200"
+      : access === "social_only"
+        ? "bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-200"
+        : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
+      {label}
+    </span>
   );
 }
 

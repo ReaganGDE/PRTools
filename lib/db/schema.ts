@@ -114,6 +114,12 @@ export const userRoleEnum = pgEnum("user_role", [
   "viewer",
 ]);
 
+export const toolAccessEnum = pgEnum("tool_access", [
+  "all",
+  "pr_only",
+  "social_only",
+]);
+
 /* ───────────────────── Auth (NextAuth) ───────────────────── */
 
 export const users = pgTable("users", {
@@ -128,6 +134,7 @@ export const users = pgTable("users", {
     onDelete: "set null",
   }),
   role: userRoleEnum("role").default("member").notNull(),
+  toolAccess: toolAccessEnum("tool_access").default("all").notNull(),
   createdAt: createdAt(),
 });
 

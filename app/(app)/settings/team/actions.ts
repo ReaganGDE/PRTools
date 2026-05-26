@@ -8,6 +8,34 @@ import { requireSession, requireSessionWithCap } from "@/lib/auth-helpers";
 import { createInvite, revokeInvite } from "@/lib/invites";
 import { logAudit } from "@/lib/audit";
 
+const ToolAccessInput = z.object({
+  userId: z.string(),
+  toolAccess: z.enum(["all", "pr_only", "social_only"]),
+});
+
+export async function changeToolAccess(userId: string, formData: FormData) {
+  const session = await requireSessionWithCap("team.role.change");
+  const parsed = ToolAccessInput.parse({
+    userId,
+    toolAccess: formData.get("toolAccess"),
+  });
+  const [target] = await db
+    .select({ workspaceId: users.workspaceId, role: users.role })
+    .from(users)
+    .where(eq(users.id, parsed.userId));
+  if (!target || target.workspaceId !== session.workspaceId) {
+    throw new Error("User not found in this workspace");
+  }
+  if (target.role === "owner") {
+    throw new Error("Cannot restrict the owner's tool access.");
+  }
+  await db
+    .update(users)
+    .set({ toolAccess: parsed.toolAccess })
+    .where(eq(users.id, parsed.userId));
+  revalidatePath("/settings/team");
+}
+
 const InviteInput = z.object({
   email: z.string().trim().email(),
   role: z.enum(["admin", "member", "viewer"]),
