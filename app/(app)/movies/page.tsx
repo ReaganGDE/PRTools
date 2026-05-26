@@ -3,12 +3,13 @@ import Image from "next/image";
 import { eq, desc, and } from "drizzle-orm";
 import { Plus, Film, Calendar } from "lucide-react";
 import { db } from "@/lib/db";
-import { movies, brands } from "@/lib/db/schema";
+import { movies, brands, workspaces } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { getActiveBrandId, getBrandsForWorkspace } from "@/lib/brand-context";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SyncFromAirtableButton } from "./sync-button";
 
 export default async function MoviesPage() {
   const session = await requireSession();
@@ -18,7 +19,7 @@ export default async function MoviesPage() {
     ? and(eq(movies.workspaceId, session.workspaceId), eq(movies.brandId, activeBrandId))
     : eq(movies.workspaceId, session.workspaceId);
 
-  const [rows, brandList] = await Promise.all([
+  const [rows, brandList, [ws]] = await Promise.all([
     db
       .select({
         movie: movies,
@@ -30,7 +31,17 @@ export default async function MoviesPage() {
       .where(where)
       .orderBy(desc(movies.createdAt)),
     getBrandsForWorkspace(session.workspaceId),
+    db
+      .select({
+        token: workspaces.airtableToken,
+        baseId: workspaces.airtableBaseId,
+      })
+      .from(workspaces)
+      .where(eq(workspaces.id, session.workspaceId)),
   ]);
+
+  const airtableReady =
+    !!ws?.token && !!ws?.baseId && brandList.some((b) => b.airtableTableId);
 
   return (
     <>
@@ -38,11 +49,14 @@ export default async function MoviesPage() {
         title="Movies"
         description="Film projects and release campaigns."
         actions={
-          <Button asChild>
-            <Link href="/movies/new">
-              <Plus className="h-4 w-4" /> New movie
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {airtableReady && <SyncFromAirtableButton />}
+            <Button asChild>
+              <Link href="/movies/new">
+                <Plus className="h-4 w-4" /> New movie
+              </Link>
+            </Button>
+          </div>
         }
       />
       <div className="p-8">

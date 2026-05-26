@@ -176,6 +176,8 @@ export const verificationTokens = pgTable(
 export const workspaces = pgTable("workspaces", {
   id: id(),
   name: text("name").notNull(),
+  airtableToken: text("airtable_token"),
+  airtableBaseId: text("airtable_base_id"),
   createdAt: createdAt(),
 });
 
@@ -216,6 +218,8 @@ export const brands = pgTable(
     type: brandTypeEnum("type").default("company").notNull(),
     color: text("color").default("#dc2626").notNull(),
     active: boolean("active").default(true).notNull(),
+    airtableTableId: text("airtable_table_id"),
+    airtableLastSyncedAt: timestamp("airtable_last_synced_at"),
     createdAt: createdAt(),
   },
   (t) => [index("brands_workspace_idx").on(t.workspaceId)],
@@ -245,14 +249,24 @@ export const movies = pgTable(
     distributor: text("distributor"),
     mpaaRating: text("mpaa_rating"),
     synopsis: text("synopsis"),
+    logline: text("logline"),
+    tagline: text("tagline"),
     posterUrl: text("poster_url"),
+    trailerUrl: text("trailer_url"),
+    imdbUrl: text("imdb_url"),
+    director: text("director"),
+    castList: text("cast_list"),
+    producer: text("producer"),
     manageSocials: boolean("manage_socials").default(true).notNull(),
     status: movieStatusEnum("status").default("in_production").notNull(),
+    airtableRecordId: text("airtable_record_id"),
+    airtableSyncedAt: timestamp("airtable_synced_at"),
     createdAt: createdAt(),
   },
   (t) => [
     index("movies_workspace_idx").on(t.workspaceId),
     index("movies_brand_idx").on(t.brandId),
+    uniqueIndex("movies_airtable_uq").on(t.workspaceId, t.airtableRecordId),
   ],
 );
 

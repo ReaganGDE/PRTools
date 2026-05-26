@@ -92,10 +92,15 @@ export default async function SettingsPage() {
           <CardHeader>
             <CardTitle>Integrations</CardTitle>
             <CardDescription>
-              Status of API keys configured in <code>.env.local</code>. See SETUP.md.
+              <Link href="/settings/integrations" className="hover:underline">
+                Configure Airtable and other workspace integrations →
+              </Link>
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-500">
+              Environment status
+            </p>
             <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {integrations.map((i) => (
                 <li key={i.name} className="flex items-center justify-between py-2 text-sm">

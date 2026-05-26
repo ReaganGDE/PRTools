@@ -41,13 +41,16 @@ export async function updateBrand(brandId: string, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const color = String(formData.get("color") ?? "#dc2626");
   const active = formData.get("active") === "on";
+  const airtableTableId =
+    (formData.get("airtableTableId") as string | null)?.trim() || null;
   if (!name) throw new Error("Brand name is required");
 
   await db
     .update(brands)
-    .set({ name, color, active })
+    .set({ name, color, active, airtableTableId })
     .where(
       and(eq(brands.id, brandId), eq(brands.workspaceId, session.workspaceId)),
     );
   revalidatePath("/", "layout");
+  revalidatePath("/brands");
 }

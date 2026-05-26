@@ -36,6 +36,13 @@
       "when": 1779378897156,
       "tag": "0004_brands_movies",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779806364156,
+      "tag": "0005_airtable_integration",
+      "breakpoints": true
     }
   ]
 }
