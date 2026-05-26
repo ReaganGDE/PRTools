@@ -185,9 +185,8 @@ export async function syncMoviesFromAirtable(): Promise<{
           readDate(f, "Theatrical Release");
         const tvodDate = readDate(f, "TVOD Date");
         const avodDate = readDate(f, "AVOD Date") ?? readDate(f, "CUTV Date");
-        // Only use theatrical date as the canonical release date — TVOD/AVOD
-        // dates are contractual windows, not actual release dates.
-        const releaseDate = theatricalDate ?? null;
+        // TVOD Date is the canonical release date for our workflow.
+        const releaseDate = tvodDate ?? theatricalDate ?? avodDate ?? null;
 
         const posterUrl = pickPosterUrl(
           readAttachments(f, "Stills & Press Materials") ??
