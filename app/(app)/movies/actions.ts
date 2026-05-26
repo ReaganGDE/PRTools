@@ -14,7 +14,7 @@ import {
   readNumber,
   readString,
 } from "@/lib/integrations/airtable";
-import { searchMoviePoster } from "@/lib/integrations/tmdb";
+import { lookupMoviePoster, searchMoviePoster } from "@/lib/integrations/tmdb";
 
 const STATUSES = ["in_production", "pre_release", "released", "archived"] as const;
 type Status = (typeof STATUSES)[number];
@@ -162,6 +162,9 @@ async function dedupeMovies(workspaceId: string): Promise<number> {
 export async function backfillPostersFromTmdb(): Promise<{
   scanned: number;
   found: number;
+  apiErrors: number;
+  firstError: string | null;
+  sampleMatches: string[];
 }> {
   const session = await requireSession();
 
@@ -185,18 +188,45 @@ export async function backfillPostersFromTmdb(): Promise<{
     );
 
   let found = 0;
+  let apiErrors = 0;
+  let firstError: string | null = null;
+  const matched: string[] = [];
+
   for (const row of rows) {
-    const url = await searchMoviePoster(
+    const r = await lookupMoviePoster(
       row.title,
       row.releaseDate?.getFullYear() ?? null,
     );
-    if (url) {
-      await db.update(movies).set({ posterUrl: url }).where(eq(movies.id, row.id));
+    if (!r.ok) {
+      apiErrors++;
+      if (!firstError) firstError = r.error;
+      // If the very first call fails with an auth error, stop wasting requests.
+      if (
+        apiErrors === 1 &&
+        (r.error.includes("401") ||
+          r.error.toLowerCase().includes("invalid api key"))
+      ) {
+        throw new Error(`TMDB rejected the API key — ${r.error}`);
+      }
+      continue;
+    }
+    if (r.posterUrl) {
+      await db
+        .update(movies)
+        .set({ posterUrl: r.posterUrl })
+        .where(eq(movies.id, row.id));
+      matched.push(`${row.title} → ${r.matchedTitle ?? "?"}`);
       found++;
     }
   }
   revalidatePath("/movies");
-  return { scanned: rows.length, found };
+  return {
+    scanned: rows.length,
+    found,
+    apiErrors,
+    firstError,
+    sampleMatches: matched.slice(0, 5),
+  };
 }
 
 export async function syncMoviesFromAirtable(): Promise<{

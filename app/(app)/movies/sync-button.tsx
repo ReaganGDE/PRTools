@@ -35,9 +35,14 @@ export function SyncFromAirtableButton() {
     startTransition(async () => {
       try {
         const data = await backfillPostersFromTmdb();
-        setPosterMsg(
-          `Scanned ${data.scanned} movie${data.scanned === 1 ? "" : "s"}, added ${data.found} poster${data.found === 1 ? "" : "s"} from TMDB.`,
-        );
+        let msg = `Scanned ${data.scanned}, added ${data.found} poster${data.found === 1 ? "" : "s"} from TMDB.`;
+        if (data.apiErrors > 0 && data.firstError) {
+          msg += ` ${data.apiErrors} API error${data.apiErrors === 1 ? "" : "s"} (${data.firstError}).`;
+        }
+        if (data.sampleMatches.length > 0) {
+          msg += ` e.g. ${data.sampleMatches.join("; ")}`;
+        }
+        setPosterMsg(msg);
       } catch (e) {
         setError((e as Error).message);
       }
