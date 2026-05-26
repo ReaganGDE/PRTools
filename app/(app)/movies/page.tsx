@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, asc, sql } from "drizzle-orm";
 import { Plus, Film, Calendar, LayoutGrid, List } from "lucide-react";
 import { db } from "@/lib/db";
 import { movies, brands, workspaces } from "@/lib/db/schema";
@@ -37,7 +37,12 @@ export default async function MoviesPage({
       .from(movies)
       .leftJoin(brands, eq(brands.id, movies.brandId))
       .where(where)
-      .orderBy(desc(movies.createdAt)),
+      // Upcoming films first (release_date ASC), null dates at the end
+      .orderBy(
+        sql`${movies.releaseDate} IS NULL ASC`,
+        asc(movies.releaseDate),
+        asc(movies.title),
+      ),
     getBrandsForWorkspace(session.workspaceId),
     db
       .select({

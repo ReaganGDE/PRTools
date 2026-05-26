@@ -179,20 +179,37 @@ export async function syncMoviesFromAirtable(): Promise<{
         const studioBrand = studio ? brandByName.get(norm(studio)) : undefined;
         const brandForRecord = studioBrand ?? brandsForTable[0];
 
-        const theatricalDate = readDate(f, "Theatrical Date");
+        const theatricalDate =
+          readDate(f, "Theatrical Date") ??
+          readDate(f, "Theatrical Release Date") ??
+          readDate(f, "Theatrical Release");
         const tvodDate = readDate(f, "TVOD Date");
         const avodDate = readDate(f, "AVOD Date") ?? readDate(f, "CUTV Date");
-        const releaseDate = theatricalDate ?? tvodDate ?? avodDate ?? null;
+        // Only use theatrical date as the canonical release date — TVOD/AVOD
+        // dates are contractual windows, not actual release dates.
+        const releaseDate = theatricalDate ?? null;
 
         const posterUrl = pickPosterUrl(
           readAttachments(f, "Stills & Press Materials") ??
             readAttachments(f, "Attachments"),
         );
 
+        // Infer status from release date so synced films aren't all "in_production"
+        const today = new Date();
+        const inferredStatus: Status =
+          !releaseDate
+            ? "in_production"
+            : releaseDate <= today
+              ? "released"
+              : releaseDate <= new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000)
+                ? "pre_release"
+                : "in_production";
+
         const values = {
           workspaceId: session.workspaceId,
           brandId: brandForRecord.id,
           title,
+          status: inferredStatus,
           releaseDate,
           theatricalDate,
           tvodDate,
