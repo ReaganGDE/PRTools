@@ -181,6 +181,7 @@ export async function backfillPostersFromTmdb(): Promise<{
       id: movies.id,
       title: movies.title,
       releaseDate: movies.releaseDate,
+      director: movies.director,
       posterUrl: movies.posterUrl,
       posterAirtableUrl: movies.posterAirtableUrl,
     })
@@ -196,6 +197,7 @@ export async function backfillPostersFromTmdb(): Promise<{
     const r = await lookupMoviePoster(
       row.title,
       row.releaseDate?.getFullYear() ?? null,
+      row.director ?? null,
     );
     if (!r.ok) {
       apiErrors++;
@@ -323,9 +325,11 @@ export async function syncMoviesFromAirtable(): Promise<{
           readAttachments(f, "Stills & Press Materials") ??
             readAttachments(f, "Attachments"),
         );
+        const director = readString(f, "Director(s)") ?? readString(f, "Director");
         const tmdbPosterUrl = await searchMoviePoster(
           title,
           releaseDate?.getFullYear() ?? null,
+          director ?? null,
         );
         // Prefer TMDB (permanent CDN URL) over Airtable (expiring signed URL)
         const posterUrl = tmdbPosterUrl ?? posterAirtableUrl;
@@ -372,7 +376,7 @@ export async function syncMoviesFromAirtable(): Promise<{
           websiteUrl: readString(f, "Website"),
           pressKitUrl: readString(f, "Press Kit Link"),
           socialMediaUrl: readString(f, "Social Media"),
-          director: readString(f, "Director(s)") ?? readString(f, "Director"),
+          director,
           writer: readString(f, "Writer(s)") ?? readString(f, "Writer"),
           castList: readString(f, "Cast"),
           producer: readString(f, "Producer(s)") ?? readString(f, "Producer"),

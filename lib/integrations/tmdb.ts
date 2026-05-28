@@ -38,10 +38,41 @@ function titleWordCoverage(searchTitle: string, candidateTitle: string): number 
   return matches / sw.length;
 }
 
+// Returns true if at least one word from knownDirector appears in any of the
+// TMDB crew directors. Handles "Liza Mandelup" matching "Liza Mandelup", and
+// is lenient enough for minor name differences.
+function directorMatches(knownDirector: string, tmdbDirectors: string[]): boolean {
+  const normalize = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().split(/\s+/).filter(Boolean);
+  const knownWords = new Set(normalize(knownDirector));
+  for (const d of tmdbDirectors) {
+    const dWords = normalize(d);
+    if (dWords.some((w) => knownWords.has(w))) return true;
+  }
+  return false;
+}
+
+async function fetchDirectors(movieId: number, apiKey: string): Promise<string[]> {
+  try {
+    const url = `${API}/movie/${movieId}/credits?api_key=${apiKey}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      crew?: { job: string; name: string }[];
+    };
+    return (data.crew ?? [])
+      .filter((c) => c.job === "Director")
+      .map((c) => c.name);
+  } catch {
+    return [];
+  }
+}
+
 // Detailed version — returns ok/error so callers can surface API issues.
 export async function lookupMoviePoster(
   title: string,
   year?: number | null,
+  director?: string | null,
 ): Promise<TMDBLookupResult> {
   const key = process.env.TMDB_API_KEY;
   if (!key) return { ok: false, error: "TMDB_API_KEY not set" };
@@ -61,7 +92,6 @@ export async function lookupMoviePoster(
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      // TMDB returns JSON errors like {"status_code":7,"status_message":"Invalid API key..."}
       let message = `TMDB ${res.status}`;
       try {
         const parsed = JSON.parse(body) as { status_message?: string };
@@ -80,9 +110,7 @@ export async function lookupMoviePoster(
     const target = searchTitle.toLowerCase().trim();
     const targetYear = year ?? null;
     // Score: exact title match (+10), year match (+5), popularity (raw).
-    // Only keep results with a poster AND sufficient title word overlap.
-    // Requiring >= 60% of the search words to appear in the candidate title
-    // prevents false matches like "Caterpillar" → Dutch film "Rups".
+    // Only keep results with a poster AND sufficient title word overlap (>= 60%).
     const MIN_COVERAGE = 0.6;
     const scored = results
       .map((r) => {
@@ -99,6 +127,28 @@ export async function lookupMoviePoster(
       })
       .filter((s) => s.r.poster_path && s.coverage >= MIN_COVERAGE)
       .sort((a, b) => b.score - a.score);
+
+    // If we have a known director, verify the top candidates against TMDB credits.
+    // Walk down the list until we find one whose director matches, or exhaust it.
+    if (director?.trim()) {
+      for (const candidate of scored.slice(0, 5)) {
+        const tmdbDirectors = await fetchDirectors(candidate.r.id, key);
+        if (tmdbDirectors.length === 0) {
+          // No crew data — can't verify, skip rather than guess wrong.
+          continue;
+        }
+        if (directorMatches(director, tmdbDirectors)) {
+          return {
+            ok: true,
+            posterUrl: `${IMG}${candidate.r.poster_path!}`,
+            matchedTitle: candidate.r.title,
+          };
+        }
+        // Director didn't match — don't use this result.
+      }
+      // No candidate had a matching director.
+      return { ok: true, posterUrl: null, matchedTitle: null };
+    }
 
     const pick = scored[0]?.r;
     if (!pick?.poster_path)
@@ -117,8 +167,8 @@ export async function lookupMoviePoster(
 export async function searchMoviePoster(
   title: string,
   year?: number | null,
+  director?: string | null,
 ): Promise<string | null> {
-  const r = await lookupMoviePoster(title, year);
+  const r = await lookupMoviePoster(title, year, director);
   return r.ok ? r.posterUrl : null;
 }
-
