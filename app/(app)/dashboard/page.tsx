@@ -1,16 +1,25 @@
 import Link from "next/link";
-import { eq, desc, count, and, gte, lte, or } from "drizzle-orm";
+import { eq, desc, asc, count, and, gte, lte, or, sql } from "drizzle-orm";
 import {
   AlertTriangle,
   Calendar,
   CheckCircle2,
   ChevronRight,
   Clock,
+  Film,
   MessageSquare,
   Users,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { contacts, campaigns, sends, mentions, socialPosts } from "@/lib/db/schema";
+import {
+  contacts,
+  campaigns,
+  sends,
+  mentions,
+  socialPosts,
+  movies,
+  brands,
+} from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { getActiveBrandId } from "@/lib/brand-context";
 import { PageHeader } from "@/components/page-header";
@@ -100,6 +109,59 @@ export default async function DashboardPage() {
       ),
   ]);
 
+  // Next release(s) — if a brand is active, just that brand's next upcoming
+  // movie; if "all", show one upcoming movie from each brand.
+  type UpcomingMovie = {
+    id: string;
+    title: string;
+    posterUrl: string | null;
+    releaseDate: Date;
+    brandName: string | null;
+    brandColor: string | null;
+  };
+
+  let upcomingMovies: UpcomingMovie[] = [];
+  if (activeBrandId) {
+    const rows = await db
+      .select({
+        id: movies.id,
+        title: movies.title,
+        posterUrl: movies.posterUrl,
+        releaseDate: movies.releaseDate,
+        brandName: brands.name,
+        brandColor: brands.color,
+      })
+      .from(movies)
+      .leftJoin(brands, eq(movies.brandId, brands.id))
+      .where(
+        and(
+          eq(movies.workspaceId, wsId),
+          eq(movies.brandId, activeBrandId),
+          gte(movies.releaseDate, now),
+        ),
+      )
+      .orderBy(asc(movies.releaseDate))
+      .limit(1);
+    upcomingMovies = rows
+      .filter((r): r is typeof r & { releaseDate: Date } => r.releaseDate !== null);
+  } else {
+    // One per brand, picked via DISTINCT ON.
+    const rows = (await db.execute(sql`
+      SELECT DISTINCT ON (m.brand_id)
+        m.id, m.title, m.poster_url AS "posterUrl", m.release_date AS "releaseDate",
+        b.name AS "brandName", b.color AS "brandColor"
+      FROM movies m
+      LEFT JOIN brands b ON b.id = m.brand_id
+      WHERE m.workspace_id = ${wsId}
+        AND m.release_date >= ${now}
+      ORDER BY m.brand_id, m.release_date ASC
+    `)) as unknown as UpcomingMovie[];
+    upcomingMovies = rows
+      .filter((r) => r.releaseDate !== null)
+      .map((r) => ({ ...r, releaseDate: new Date(r.releaseDate) }))
+      .sort((a, b) => a.releaseDate.getTime() - b.releaseDate.getTime());
+  }
+
   const firstName =
     session.email?.split("@")[0]?.split(".")[0] ?? "there";
   const displayName =
@@ -133,6 +195,40 @@ export default async function DashboardPage() {
                 href="/sentiment"
               />
             )}
+          </div>
+        )}
+
+        {/* Next release(s) */}
+        {upcomingMovies.length > 0 && (
+          <div>
+            <SectionHeading
+              icon={<Film className="h-4 w-4" />}
+              label={
+                activeBrandId
+                  ? "Next release"
+                  : `Next release per brand (${upcomingMovies.length})`
+              }
+              action={
+                <Link
+                  href="/movies"
+                  className="text-xs text-red-600 hover:underline dark:text-red-400"
+                >
+                  All movies →
+                </Link>
+              }
+            />
+            <div
+              className={cn(
+                "grid gap-3",
+                upcomingMovies.length === 1
+                  ? "sm:grid-cols-1"
+                  : "sm:grid-cols-2 lg:grid-cols-3",
+              )}
+            >
+              {upcomingMovies.map((m) => (
+                <NextReleaseCard key={m.id} movie={m} />
+              ))}
+            </div>
           </div>
         )}
 
@@ -357,6 +453,74 @@ function StatCard({
     </Link>
   ) : (
     inner
+  );
+}
+
+function NextReleaseCard({
+  movie,
+}: {
+  movie: {
+    id: string;
+    title: string;
+    posterUrl: string | null;
+    releaseDate: Date;
+    brandName: string | null;
+    brandColor: string | null;
+  };
+}) {
+  const daysUntil = Math.ceil(
+    (movie.releaseDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000),
+  );
+  const dateLabel = movie.releaseDate.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return (
+    <Link
+      href={`/movies/${movie.id}`}
+      className="group flex gap-3 rounded-xl border border-zinc-200/80 bg-white p-3 shadow-sm transition-all duration-150 hover:shadow-md dark:border-zinc-800/60 dark:bg-zinc-900"
+    >
+      <div className="relative h-24 w-16 shrink-0 overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800">
+        {movie.posterUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={movie.posterUrl}
+            alt={movie.title}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <Film className="h-6 w-6 text-zinc-400" />
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        {movie.brandName && (
+          <div className="flex items-center gap-1.5">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ background: movie.brandColor ?? "#888" }}
+            />
+            <span className="truncate text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+              {movie.brandName}
+            </span>
+          </div>
+        )}
+        <p className="mt-0.5 truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          {movie.title}
+        </p>
+        <p className="mt-1 text-xs text-zinc-500">{dateLabel}</p>
+        <p className="text-[11px] font-medium text-red-600 dark:text-red-400">
+          {daysUntil === 0
+            ? "Releases today"
+            : daysUntil === 1
+              ? "Tomorrow"
+              : `In ${daysUntil} days`}
+        </p>
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 self-center text-zinc-300 opacity-0 transition-opacity group-hover:opacity-100" />
+    </Link>
   );
 }
 

@@ -29,13 +29,15 @@ const NAV_GROUPS: {
   {
     label: null,
     section: null,
-    items: [{ href: "/dashboard", label: "Dashboard", icon: Home }],
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: Home },
+      { href: "/movies", label: "Movies", icon: Film },
+    ],
   },
   {
     label: "PR Tools",
     section: "pr",
     items: [
-      { href: "/movies", label: "Movies", icon: Film },
       { href: "/contacts", label: "Contacts", icon: Users },
       { href: "/outreach", label: "Outreach", icon: Send },
       { href: "/email", label: "Email", icon: Mail },
