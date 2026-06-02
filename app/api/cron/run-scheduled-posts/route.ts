@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   runDuePostsForAllWorkspaces,
   sweepOldMedia,
-} from "@/app/(app)/social/actions";
+} from "@/app/(app)/(social)/social/actions";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";

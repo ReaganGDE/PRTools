@@ -17,13 +17,21 @@ import {
   X,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { movies, brands, socialPosts, movieContacts, contacts } from "@/lib/db/schema";
+import {
+  movies,
+  brands,
+  socialPosts,
+  movieContacts,
+  contacts,
+  contactLists,
+} from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   addMovieContact,
+  addContactsFromList,
   removeMovieContact,
   toggleScreenerSent,
 } from "./press-actions";
@@ -73,6 +81,12 @@ export default async function MovieDetailPage({
       .where(eq(contacts.workspaceId, session.workspaceId))
       .orderBy(contacts.name),
   ]);
+
+  const lists = await db
+    .select({ id: contactLists.id, name: contactLists.name })
+    .from(contactLists)
+    .where(eq(contactLists.workspaceId, session.workspaceId))
+    .orderBy(contactLists.name);
 
   if (!row) notFound();
   const m = row.movie;
@@ -250,6 +264,16 @@ export default async function MovieDetailPage({
             {/* Press contacts */}
             <Section title={`Press contacts${pressContacts.length > 0 ? ` (${pressContacts.length})` : ""}`}>
               {pressContacts.length > 0 && (
+                <div className="-mt-2 mb-3 flex items-center justify-end">
+                  <Link
+                    href={`/movies/${m.id}/pitch`}
+                    className="inline-flex items-center gap-1 text-xs text-red-600 hover:underline dark:text-red-400"
+                  >
+                    <Send className="h-3 w-3" /> Send pitch
+                  </Link>
+                </div>
+              )}
+              {pressContacts.length > 0 && (
                 <ul className="mb-3 divide-y divide-zinc-100 dark:divide-zinc-800">
                   {pressContacts.map(({ mc, contactName, contactOutlet, contactBeat, contactEmail }) => (
                     <li key={mc.id} className="flex items-center gap-3 py-2.5 text-sm">
@@ -323,6 +347,27 @@ export default async function MovieDetailPage({
                   </form>
                 );
               })()}
+              {lists.length > 0 && (
+                <form
+                  action={addContactsFromList.bind(null, id)}
+                  className="mt-2 flex gap-2"
+                >
+                  <select
+                    name="listId"
+                    className="h-8 flex-1 rounded-md border border-zinc-200 bg-white px-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+                  >
+                    <option value="">Add everyone from a list…</option>
+                    {lists.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button type="submit" size="sm" variant="outline">
+                    <UserPlus className="h-3.5 w-3.5" /> Add list
+                  </Button>
+                </form>
+              )}
               {pressContacts.length === 0 && allContacts.length === 0 && (
                 <p className="text-sm text-zinc-500">
                   No contacts yet.{" "}

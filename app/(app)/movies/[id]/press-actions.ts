@@ -1,9 +1,9 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
-import { movieContacts } from "@/lib/db/schema";
+import { movieContacts, contactListMembers, contacts } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 
 export async function addMovieContact(movieId: string, formData: FormData) {
@@ -19,6 +19,41 @@ export async function addMovieContact(movieId: string, formData: FormData) {
       contactId,
     })
     .onConflictDoNothing();
+  revalidatePath(`/movies/${movieId}`);
+}
+
+// Link every contact in a list to the film at once.
+export async function addContactsFromList(movieId: string, formData: FormData) {
+  const session = await requireSession();
+  const listId = String(formData.get("listId") ?? "").trim();
+  if (!listId) return;
+
+  // Members of the list that belong to this workspace.
+  const members = await db
+    .select({ contactId: contactListMembers.contactId })
+    .from(contactListMembers)
+    .innerJoin(contacts, eq(contacts.id, contactListMembers.contactId))
+    .where(
+      and(
+        eq(contactListMembers.listId, listId),
+        eq(contacts.workspaceId, session.workspaceId),
+      ),
+    );
+
+  if (members.length === 0) return;
+
+  await db
+    .insert(movieContacts)
+    .values(
+      members.map((m) => ({
+        id: nanoid(16),
+        workspaceId: session.workspaceId,
+        movieId,
+        contactId: m.contactId,
+      })),
+    )
+    .onConflictDoNothing();
+
   revalidatePath(`/movies/${movieId}`);
 }
 

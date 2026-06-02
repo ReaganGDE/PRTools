@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { sends } from "@/lib/db/schema";
-import { suppress } from "@/app/(app)/email/actions";
+import { suppress } from "@/app/(app)/(pr)/email/actions";
 
 // Resend webhook event format:
 // {

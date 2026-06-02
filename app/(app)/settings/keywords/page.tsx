@@ -19,7 +19,7 @@ import {
   toggleKeyword,
   deleteKeyword,
   triggerPoll,
-} from "@/app/(app)/sentiment/actions";
+} from "@/app/(app)/(social)/sentiment/actions";
 
 export default async function KeywordsPage() {
   const session = await requireSession();

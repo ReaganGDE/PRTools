@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { socialPosts } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
+import { assertSectionAccess } from "@/lib/tool-access";
 import { del } from "@vercel/blob";
 import { scheduleImagePost, scheduleVideoPost } from "@/lib/platforms/oneup";
 import { logAudit } from "@/lib/audit";
@@ -92,6 +93,7 @@ function toOneUpDateTime(localStr: string): string {
 
 export async function createPost(formData: FormData) {
   const session = await requireSessionWithCap("social.post.create");
+  await assertSectionAccess("social");
 
   const accountsRaw = formData.get("accounts");
   const mediaUrlsRaw = formData.get("mediaUrls");
@@ -261,6 +263,7 @@ export async function runPost(postId: string): Promise<void> {
 
 export async function deletePost(postId: string) {
   const session = await requireSessionWithCap("social.post.create");
+  await assertSectionAccess("social");
   await db
     .delete(socialPosts)
     .where(
@@ -366,6 +369,7 @@ export async function sweepOldMedia(
 
 export async function updatePost(postId: string, formData: FormData) {
   const session = await requireSessionWithCap("social.post.create");
+  await assertSectionAccess("social");
 
   const [post] = await db
     .select()
@@ -407,6 +411,7 @@ export async function updatePost(postId: string, formData: FormData) {
 
 export async function retryPost(postId: string) {
   const session = await requireSessionWithCap("social.post.create");
+  await assertSectionAccess("social");
 
   const [post] = await db
     .select({ id: socialPosts.id, workspaceId: socialPosts.workspaceId })
@@ -433,6 +438,7 @@ export async function retryPost(postId: string) {
 // Used by /social/new — list OneUp categories for picker.
 export async function listOneUpCategories() {
   await requireSessionWithCap("social.post.create");
+  await assertSectionAccess("social");
   const { listCategories } = await import("@/lib/platforms/oneup");
   return listCategories();
 }
@@ -440,6 +446,7 @@ export async function listOneUpCategories() {
 // Used by /social/new — list accounts for a chosen category.
 export async function listOneUpCategoryAccounts(categoryId: string) {
   await requireSessionWithCap("social.post.create");
+  await assertSectionAccess("social");
   const { listCategoryAccounts } = await import("@/lib/platforms/oneup");
   return listCategoryAccounts(categoryId);
 }

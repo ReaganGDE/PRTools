@@ -13,6 +13,7 @@ import {
   emailSuppressions,
 } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
+import { assertSectionAccess } from "@/lib/tool-access";
 import { logAudit } from "@/lib/audit";
 import { resend } from "@/lib/email/resend";
 import { renderTemplate, listMergeFields } from "@/lib/email/render-template";
@@ -157,6 +158,7 @@ export async function createCampaign(formData: FormData) {
 
 export async function sendCampaign(campaignId: string) {
   const session = await requireSessionWithCap("email.campaign.send");
+  await assertSectionAccess("pr");
 
   const [campaign] = await db
     .select()

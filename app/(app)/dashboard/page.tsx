@@ -8,6 +8,7 @@ import {
   Clock,
   Film,
   MessageSquare,
+  Send,
   Users,
 } from "lucide-react";
 import { db } from "@/lib/db";
@@ -137,6 +138,32 @@ export default async function DashboardPage() {
   const statByStatus = Object.fromEntries(movieStats.map((r) => [r.status, r.count]));
   const totalMovies = movieStats.reduce((s, r) => s + r.count, 0);
 
+  // Screeners outstanding — upcoming films with linked contacts who haven't
+  // been sent a screener yet.
+  const brandClause = activeBrandId
+    ? sql`AND m.brand_id = ${activeBrandId}`
+    : sql``;
+  const screenersOutstanding = (await db.execute(sql`
+    SELECT m.id, m.title, m.release_date AS "releaseDate",
+           COUNT(mc.id)::int AS total,
+           COUNT(mc.screener_sent_at)::int AS sent
+    FROM movies m
+    JOIN movie_contacts mc ON mc.movie_id = m.id
+    WHERE m.workspace_id = ${wsId}
+      AND (m.release_date >= ${now} OR m.status = 'pre_release')
+      ${brandClause}
+    GROUP BY m.id, m.title, m.release_date
+    HAVING COUNT(mc.id) > COUNT(mc.screener_sent_at)
+    ORDER BY m.release_date ASC NULLS LAST
+    LIMIT 8
+  `)) as unknown as {
+    id: string;
+    title: string;
+    releaseDate: string | null;
+    total: number;
+    sent: number;
+  }[];
+
   // Next release(s) — if a brand is active, just that brand's next upcoming
   // movie; if "all", show one upcoming movie from each brand.
   type UpcomingMovie = {
@@ -223,6 +250,55 @@ export default async function DashboardPage() {
                 href="/sentiment"
               />
             )}
+          </div>
+        )}
+
+        {/* Screeners outstanding */}
+        {screenersOutstanding.length > 0 && (
+          <div>
+            <SectionHeading
+              icon={<Send className="h-4 w-4" />}
+              label="Screeners outstanding"
+            />
+            <ul className="space-y-2">
+              {screenersOutstanding.map((s) => {
+                const remaining = s.total - s.sent;
+                const rd = s.releaseDate ? new Date(s.releaseDate) : null;
+                return (
+                  <li key={s.id}>
+                    <Link
+                      href={`/movies/${s.id}/pitch`}
+                      className="group flex items-center gap-3 rounded-xl border border-amber-200/70 bg-amber-50/60 p-3 text-sm transition-all hover:shadow-sm dark:border-amber-900/30 dark:bg-amber-950/20"
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+                        <Send className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                          {s.title}
+                        </span>
+                        {rd && (
+                          <span className="ml-2 text-xs text-zinc-500">
+                            {rd.toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-xs font-medium text-amber-700 dark:text-amber-400">
+                        {remaining} screener{remaining === 1 ? "" : "s"} to send
+                        <span className="ml-1 text-amber-500/70">
+                          ({s.sent}/{s.total} sent)
+                        </span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-amber-400 opacity-0 transition-opacity group-hover:opacity-100" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
 

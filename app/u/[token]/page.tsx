@@ -1,5 +1,5 @@
 import { verifyUnsubToken } from "@/lib/email/footer";
-import { suppress } from "@/app/(app)/email/actions";
+import { suppress } from "@/app/(app)/(pr)/email/actions";
 import {
   Card,
   CardContent,
