@@ -34,6 +34,7 @@ export default async function DashboardPage() {
   const activeBrandId = await getActiveBrandId();
 
   const now = new Date();
+  const nowIso = now.toISOString();
   const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const socialBrandFilter = activeBrandId
@@ -150,7 +151,7 @@ export default async function DashboardPage() {
     FROM movies m
     JOIN movie_contacts mc ON mc.movie_id = m.id
     WHERE m.workspace_id = ${wsId}
-      AND (m.release_date >= ${now} OR m.status = 'pre_release')
+      AND (m.release_date >= ${nowIso} OR m.status = 'pre_release')
       ${brandClause}
     GROUP BY m.id, m.title, m.release_date
     HAVING COUNT(mc.id) > COUNT(mc.screener_sent_at)
@@ -208,7 +209,7 @@ export default async function DashboardPage() {
       FROM movies m
       LEFT JOIN brands b ON b.id = m.brand_id
       WHERE m.workspace_id = ${wsId}
-        AND m.release_date >= ${now}
+        AND m.release_date >= ${nowIso}
       ORDER BY m.brand_id, m.release_date ASC
     `)) as unknown as UpcomingMovie[];
     upcomingMovies = rows
