@@ -313,6 +313,32 @@ export const socialAccounts = pgTable("social_accounts", {
   createdAt: createdAt(),
 });
 
+/* ──────────────── Movie ↔ Contact junction ──────────────── */
+
+export const movieContacts = pgTable(
+  "movie_contacts",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    movieId: text("movie_id")
+      .notNull()
+      .references(() => movies.id, { onDelete: "cascade" }),
+    contactId: text("contact_id")
+      .notNull()
+      .references(() => contacts.id, { onDelete: "cascade" }),
+    screenerSentAt: timestamp("screener_sent_at"),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("movie_contacts_uniq").on(t.movieId, t.contactId),
+    index("movie_contacts_movie_idx").on(t.movieId),
+    index("movie_contacts_contact_idx").on(t.contactId),
+  ],
+);
+
 /* ─────────────────────── Contacts ─────────────────────── */
 
 export const contacts = pgTable(

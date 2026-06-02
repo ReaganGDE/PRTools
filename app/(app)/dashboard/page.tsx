@@ -19,6 +19,7 @@ import {
   socialPosts,
   movies,
   brands,
+  movieContacts,
 } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { getActiveBrandId } from "@/lib/brand-context";
@@ -108,6 +109,33 @@ export default async function DashboardPage() {
         ),
       ),
   ]);
+
+  // PR stats — movie counts by status
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const movieFilter = activeBrandId
+    ? and(eq(movies.workspaceId, wsId), eq(movies.brandId, activeBrandId))
+    : eq(movies.workspaceId, wsId);
+
+  const [movieStats, screenerCount] = await Promise.all([
+    db
+      .select({ status: movies.status, count: count() })
+      .from(movies)
+      .where(movieFilter)
+      .groupBy(movies.status),
+    db
+      .select({ value: count() })
+      .from(movieContacts)
+      .where(
+        and(
+          eq(movieContacts.workspaceId, wsId),
+          sql`${movieContacts.screenerSentAt} IS NOT NULL`,
+        ),
+      )
+      .then((r) => r[0]?.value ?? 0),
+  ]);
+
+  const statByStatus = Object.fromEntries(movieStats.map((r) => [r.status, r.count]));
+  const totalMovies = movieStats.reduce((s, r) => s + r.count, 0);
 
   // Next release(s) — if a brand is active, just that brand's next upcoming
   // movie; if "all", show one upcoming movie from each brand.
@@ -290,6 +318,42 @@ export default async function DashboardPage() {
           <MiniStat label="Contacts" value={contactCount} href="/contacts" />
           <MiniStat label="Messages sent" value={sendCount} />
         </div>
+
+        {/* PR stats */}
+        {totalMovies > 0 && (
+          <div>
+            <SectionHeading
+              icon={<Film className="h-4 w-4" />}
+              label="Film slate"
+              action={
+                <Link
+                  href="/movies"
+                  className="text-xs text-red-600 hover:underline dark:text-red-400"
+                >
+                  All movies →
+                </Link>
+              }
+            />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <MiniStat label="Total films" value={totalMovies} href="/movies" />
+              <MiniStat
+                label="In production"
+                value={statByStatus["in_production"] ?? 0}
+                href="/movies?status=in_production"
+              />
+              <MiniStat
+                label="Pre-release"
+                value={statByStatus["pre_release"] ?? 0}
+                href="/movies?status=pre_release"
+              />
+              <MiniStat
+                label="Screeners sent"
+                value={screenerCount}
+                href="/movies"
+              />
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

@@ -12,20 +12,38 @@ import { cn } from "@/lib/utils";
 import { SyncFromAirtableButton } from "./sync-button";
 
 type View = "grid" | "list";
+type StatusFilter = "all" | "in_production" | "pre_release" | "released" | "archived";
+
+const STATUS_LABELS: Record<StatusFilter, string> = {
+  all: "All",
+  in_production: "In production",
+  pre_release: "Pre-release",
+  released: "Released",
+  archived: "Archived",
+};
 
 export default async function MoviesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; status?: string }>;
 }) {
   const session = await requireSession();
   const activeBrandId = await getActiveBrandId();
   const sp = await searchParams;
   const view: View = sp.view === "list" ? "list" : "grid";
+  const statusFilter: StatusFilter =
+    (["in_production", "pre_release", "released", "archived"].includes(sp.status ?? "")
+      ? sp.status
+      : "all") as StatusFilter;
 
-  const where = activeBrandId
+  const baseCond = activeBrandId
     ? and(eq(movies.workspaceId, session.workspaceId), eq(movies.brandId, activeBrandId))
     : eq(movies.workspaceId, session.workspaceId);
+
+  const where =
+    statusFilter === "all"
+      ? baseCond
+      : and(baseCond, eq(movies.status, statusFilter as "in_production" | "pre_release" | "released" | "archived"));
 
   const [rows, brandList, [ws]] = await Promise.all([
     db
@@ -74,6 +92,35 @@ export default async function MoviesPage({
         }
       />
       <div className="p-8">
+        {/* Status filter pills */}
+        <div className="mb-5 flex flex-wrap gap-2">
+          {(Object.keys(STATUS_LABELS) as StatusFilter[]).map((s) => {
+            const params = new URLSearchParams();
+            if (view !== "grid") params.set("view", view);
+            if (s !== "all") params.set("status", s);
+            const href = `/movies${params.toString() ? `?${params}` : ""}`;
+            return (
+              <Link
+                key={s}
+                href={href}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                  statusFilter === s
+                    ? s === "released"
+                      ? "border-emerald-500 bg-emerald-500 text-white"
+                      : s === "pre_release"
+                        ? "border-amber-500 bg-amber-500 text-white"
+                        : s === "in_production"
+                          ? "border-blue-500 bg-blue-500 text-white"
+                          : "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                    : "border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900",
+                )}
+              >
+                {STATUS_LABELS[s]}
+              </Link>
+            );
+          })}
+        </div>
         {rows.length === 0 ? (
           <EmptyState hasBrands={brandList.length > 0} />
         ) : view === "grid" ? (

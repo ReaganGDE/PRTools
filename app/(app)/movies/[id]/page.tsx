@@ -12,13 +12,21 @@ import {
   Building2,
   Tag,
   Pencil,
+  Send,
+  UserPlus,
+  X,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { movies, brands, socialPosts } from "@/lib/db/schema";
+import { movies, brands, socialPosts, movieContacts, contacts } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  addMovieContact,
+  removeMovieContact,
+  toggleScreenerSent,
+} from "./press-actions";
 
 export default async function MovieDetailPage({
   params,
@@ -28,7 +36,7 @@ export default async function MovieDetailPage({
   const { id } = await params;
   const session = await requireSession();
 
-  const [[row], moviePosts] = await Promise.all([
+  const [[row], moviePosts, pressContacts, allContacts] = await Promise.all([
     db
       .select({ movie: movies, brandName: brands.name, brandColor: brands.color })
       .from(movies)
@@ -47,6 +55,23 @@ export default async function MovieDetailPage({
       )
       .orderBy(desc(socialPosts.createdAt))
       .limit(10),
+    db
+      .select({
+        mc: movieContacts,
+        contactName: contacts.name,
+        contactOutlet: contacts.outlet,
+        contactBeat: contacts.beat,
+        contactEmail: contacts.email,
+      })
+      .from(movieContacts)
+      .innerJoin(contacts, eq(movieContacts.contactId, contacts.id))
+      .where(eq(movieContacts.movieId, id))
+      .orderBy(movieContacts.createdAt),
+    db
+      .select({ id: contacts.id, name: contacts.name, outlet: contacts.outlet })
+      .from(contacts)
+      .where(eq(contacts.workspaceId, session.workspaceId))
+      .orderBy(contacts.name),
   ]);
 
   if (!row) notFound();
@@ -221,6 +246,93 @@ export default async function MovieDetailPage({
                 <CreditRow label="Copyright" value={m.copyrightLine} />
               </Section>
             )}
+
+            {/* Press contacts */}
+            <Section title={`Press contacts${pressContacts.length > 0 ? ` (${pressContacts.length})` : ""}`}>
+              {pressContacts.length > 0 && (
+                <ul className="mb-3 divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {pressContacts.map(({ mc, contactName, contactOutlet, contactBeat, contactEmail }) => (
+                    <li key={mc.id} className="flex items-center gap-3 py-2.5 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/contacts/${mc.contactId}`}
+                          className="font-medium hover:underline"
+                        >
+                          {contactName}
+                        </Link>
+                        {(contactOutlet || contactBeat) && (
+                          <p className="truncate text-xs text-zinc-500">
+                            {[contactOutlet, contactBeat].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                        {contactEmail && (
+                          <p className="text-xs text-zinc-400">{contactEmail}</p>
+                        )}
+                      </div>
+                      <form action={toggleScreenerSent.bind(null, id, mc.contactId)}>
+                        <button
+                          type="submit"
+                          title={mc.screenerSentAt ? "Mark screener not sent" : "Mark screener sent"}
+                          className={cn(
+                            "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
+                            mc.screenerSentAt
+                              ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
+                              : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400",
+                          )}
+                        >
+                          <Send className="h-2.5 w-2.5" />
+                          {mc.screenerSentAt
+                            ? `Sent ${mc.screenerSentAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+                            : "Screener?"}
+                        </button>
+                      </form>
+                      <form action={removeMovieContact.bind(null, id, mc.contactId)}>
+                        <button
+                          type="submit"
+                          title="Remove"
+                          className="rounded p-1 text-zinc-400 hover:text-red-500"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {/* Add contact form */}
+              {(() => {
+                const linkedIds = new Set(pressContacts.map((pc) => pc.mc.contactId));
+                const unlinked = allContacts.filter((c) => !linkedIds.has(c.id));
+                if (unlinked.length === 0) return null;
+                return (
+                  <form action={addMovieContact.bind(null, id)} className="flex gap-2">
+                    <select
+                      name="contactId"
+                      className="h-8 flex-1 rounded-md border border-zinc-200 bg-white px-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+                    >
+                      <option value="">Add a press contact…</option>
+                      {unlinked.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}{c.outlet ? ` — ${c.outlet}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <Button type="submit" size="sm" variant="outline">
+                      <UserPlus className="h-3.5 w-3.5" /> Add
+                    </Button>
+                  </form>
+                );
+              })()}
+              {pressContacts.length === 0 && allContacts.length === 0 && (
+                <p className="text-sm text-zinc-500">
+                  No contacts yet.{" "}
+                  <Link href="/contacts" className="text-red-600 hover:underline dark:text-red-400">
+                    Add contacts
+                  </Link>{" "}
+                  first.
+                </p>
+              )}
+            </Section>
 
             {/* Recent posts for this movie */}
             <Section title="Recent posts">

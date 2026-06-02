@@ -9,6 +9,9 @@ import {
   dmMessages,
   contactLists,
   contactListMembers,
+  movieContacts,
+  movies,
+  brands,
 } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
@@ -88,6 +91,23 @@ export default async function ContactDetailPage({
     .where(eq(contactLists.workspaceId, session.workspaceId))
     .orderBy(contactLists.name);
 
+  // Movies this contact is linked to
+  const linkedMovies = await db
+    .select({
+      mc: movieContacts,
+      movieTitle: movies.title,
+      moviePosterUrl: movies.posterUrl,
+      movieStatus: movies.status,
+      movieReleaseDate: movies.releaseDate,
+      brandName: brands.name,
+      brandColor: brands.color,
+    })
+    .from(movieContacts)
+    .innerJoin(movies, eq(movieContacts.movieId, movies.id))
+    .leftJoin(brands, eq(movies.brandId, brands.id))
+    .where(eq(movieContacts.contactId, id))
+    .orderBy(desc(movies.releaseDate));
+
   const boundUpdate = updateContact.bind(null, contact.id);
   const boundDelete = deleteContact.bind(null, contact.id);
 
@@ -131,6 +151,51 @@ export default async function ContactDetailPage({
               />
             </CardContent>
           </Card>
+
+          {linkedMovies.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Films</CardTitle>
+                <CardDescription>Movies this contact is assigned to.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {linkedMovies.map(({ mc, movieTitle, movieStatus, movieReleaseDate, brandName, brandColor }) => (
+                    <li key={mc.id} className="flex items-center justify-between gap-2 text-sm">
+                      <Link
+                        href={`/movies/${mc.movieId}`}
+                        className="min-w-0 flex-1 font-medium hover:underline truncate"
+                      >
+                        {brandColor && (
+                          <span
+                            className="mr-1.5 inline-block h-2 w-2 rounded-sm"
+                            style={{ backgroundColor: brandColor }}
+                          />
+                        )}
+                        {movieTitle}
+                      </Link>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {mc.screenerSentAt && (
+                          <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            Screener sent
+                          </span>
+                        )}
+                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize ${
+                          movieStatus === "released"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            : movieStatus === "pre_release"
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                              : "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                        }`}>
+                          {movieStatus?.replace("_", " ")}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
