@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { FollowUpDaysForm } from "./follow-up-days-form";
 function isSet(name: string) {
   const v = process.env[name];
   return !!(v && v.length > 0);
@@ -87,6 +88,19 @@ export default async function SettingsPage() {
             </CardContent>
           </Card>
         ) : null}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>PR Settings</CardTitle>
+            <CardDescription>Configure follow-up reminders and other PR defaults.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FollowUpDaysForm defaultValue={ws?.followUpDays ?? 4} />
+            <p className="mt-2 text-xs text-zinc-400">
+              Contacts who received a screener this many days ago without a reply will appear in the dashboard follow-ups section.
+            </p>
+          </CardContent>
+        </Card>
 
         <Card className="lg:col-span-2">
           <CardHeader>

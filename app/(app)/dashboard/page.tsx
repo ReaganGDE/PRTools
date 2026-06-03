@@ -8,7 +8,11 @@ import {
   Clock,
   Film,
   MessageSquare,
+  Newspaper,
   Send,
+  ThumbsDown,
+  ThumbsUp,
+  Minus,
   Users,
 } from "lucide-react";
 import { db } from "@/lib/db";
@@ -21,6 +25,8 @@ import {
   movies,
   brands,
   movieContacts,
+  movieCoverages,
+  workspaces,
 } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { getActiveBrandId } from "@/lib/brand-context";
@@ -36,6 +42,13 @@ export default async function DashboardPage() {
   const now = new Date();
   const nowIso = now.toISOString();
   const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  // Workspace settings (follow-up window)
+  const [ws] = await db
+    .select({ followUpDays: workspaces.followUpDays })
+    .from(workspaces)
+    .where(eq(workspaces.id, wsId));
+  const followUpDays = ws?.followUpDays ?? 4;
 
   const socialBrandFilter = activeBrandId
     ? and(
@@ -165,11 +178,10 @@ export default async function DashboardPage() {
     sent: number;
   }[];
 
-  // Follow-ups due — contacts who were sent a screener 4+ days ago and have
-  // not replied to any pitch for that film. Prime candidates for a nudge.
-  const FOLLOWUP_DAYS = 4;
+  // Follow-ups due — contacts who were sent a screener N+ days ago (N is
+  // workspace-configurable) and haven't replied to any pitch for that film.
   const followupCutoff = new Date(
-    now.getTime() - FOLLOWUP_DAYS * 24 * 60 * 60 * 1000,
+    now.getTime() - followUpDays * 24 * 60 * 60 * 1000,
   ).toISOString();
   const followUpsDue = (await db.execute(sql`
     SELECT mc.movie_id AS "movieId", m.title,
@@ -201,6 +213,36 @@ export default async function DashboardPage() {
     email: string | null;
     screenerSentAt: string;
   }[];
+
+  // Recent coverage + sentiment breakdown.
+  const brandCovFilter = activeBrandId
+    ? and(eq(movieCoverages.workspaceId, wsId), eq(movies.brandId, activeBrandId))
+    : eq(movieCoverages.workspaceId, wsId);
+
+  const [recentCoverage, coverageSentiment] = await Promise.all([
+    db
+      .select({
+        id: movieCoverages.id,
+        movieId: movieCoverages.movieId,
+        movieTitle: movies.title,
+        outlet: movieCoverages.outlet,
+        headline: movieCoverages.headline,
+        url: movieCoverages.url,
+        publishedAt: movieCoverages.publishedAt,
+        sentiment: movieCoverages.sentiment,
+      })
+      .from(movieCoverages)
+      .innerJoin(movies, eq(movieCoverages.movieId, movies.id))
+      .where(brandCovFilter)
+      .orderBy(desc(movieCoverages.publishedAt))
+      .limit(6),
+    db
+      .select({ sentiment: movieCoverages.sentiment, total: count() })
+      .from(movieCoverages)
+      .innerJoin(movies, eq(movieCoverages.movieId, movies.id))
+      .where(brandCovFilter)
+      .groupBy(movieCoverages.sentiment),
+  ]);
 
   // Next release(s) — if a brand is active, just that brand's next upcoming
   // movie; if "all", show one upcoming movie from each brand.
@@ -383,6 +425,77 @@ export default async function DashboardPage() {
                   </li>
                 );
               })}
+            </ul>
+          </div>
+        )}
+
+        {/* Recent coverage */}
+        {recentCoverage.length > 0 && (
+          <div>
+            <SectionHeading icon={<Newspaper className="h-4 w-4" />} label="Recent coverage" />
+            {coverageSentiment.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {coverageSentiment.map((s) => (
+                  <span
+                    key={String(s.sentiment)}
+                    className={
+                      "flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium " +
+                      (s.sentiment === "positive"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                        : s.sentiment === "negative"
+                          ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300")
+                    }
+                  >
+                    {s.sentiment === "positive" ? (
+                      <ThumbsUp className="h-3 w-3" />
+                    ) : s.sentiment === "negative" ? (
+                      <ThumbsDown className="h-3 w-3" />
+                    ) : (
+                      <Minus className="h-3 w-3" />
+                    )}
+                    {s.total} {s.sentiment ?? "unrated"}
+                  </span>
+                ))}
+              </div>
+            )}
+            <ul className="space-y-2">
+              {recentCoverage.map((cov) => (
+                <li key={cov.id} className="flex items-start gap-3 rounded-xl border border-zinc-200/80 bg-white p-3 text-sm shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900">
+                  <span className="mt-0.5 shrink-0">
+                    {cov.sentiment === "positive" ? (
+                      <ThumbsUp className="h-3.5 w-3.5 text-emerald-500" />
+                    ) : cov.sentiment === "negative" ? (
+                      <ThumbsDown className="h-3.5 w-3.5 text-red-500" />
+                    ) : (
+                      <Minus className="h-3.5 w-3.5 text-zinc-400" />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    {cov.headline ? (
+                      cov.url ? (
+                        <a href={cov.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">
+                          {cov.headline}
+                        </a>
+                      ) : (
+                        <span className="font-medium">{cov.headline}</span>
+                      )
+                    ) : null}
+                    <p className="text-xs text-zinc-500">
+                      {[
+                        cov.outlet,
+                        cov.publishedAt?.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }),
+                      ].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/movies/${cov.movieId}`}
+                    className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
+                  >
+                    {cov.movieTitle}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         )}

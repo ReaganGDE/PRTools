@@ -13,6 +13,8 @@ import {
   Check,
   ExternalLink,
   Info,
+  Bookmark,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +23,7 @@ import {
   type InfluencerSearchResult,
 } from "./actions";
 import type { InfluencerResult } from "@/lib/integrations/youtube-influencers";
+import { saveSearch, deleteSavedSearch } from "@/lib/saved-search-actions";
 
 const PLATFORMS = [
   { id: "youtube", label: "YouTube", icon: Video },
@@ -34,18 +37,25 @@ function fmt(n: number): string {
   return String(n);
 }
 
+type SavedSearch = { id: string; name: string; query: string; platforms: string[] };
+
 export function InfluencerFinder({
   youtubeEnabled,
   modashEnabled,
+  savedSearches: initialSavedSearches,
 }: {
   youtubeEnabled: boolean;
   modashEnabled: boolean;
+  savedSearches: SavedSearch[];
 }) {
   const [query, setQuery] = useState("");
   const [platforms, setPlatforms] = useState<Set<string>>(new Set(["youtube"]));
   const [data, setData] = useState<InfluencerSearchResult | null>(null);
   const [isPending, startTransition] = useTransition();
   const [added, setAdded] = useState<Record<string, "adding" | "done" | "dupe">>({});
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(initialSavedSearches);
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [saveNameInput, setSaveNameInput] = useState("");
 
   function togglePlatform(id: string) {
     setPlatforms((prev) => {
@@ -54,6 +64,11 @@ export function InfluencerFinder({
       else next.add(id);
       return next;
     });
+  }
+
+  function loadSavedSearch(s: SavedSearch) {
+    setQuery(s.query);
+    setPlatforms(new Set(s.platforms.length > 0 ? s.platforms : ["youtube"]));
   }
 
   function handleSearch(e: React.FormEvent) {
@@ -86,6 +101,26 @@ export function InfluencerFinder({
         ...prev,
         [key]: res.added ? "done" : "dupe",
       }));
+    });
+  }
+
+  function handleSaveSearch() {
+    if (!saveNameInput.trim() || !query.trim()) return;
+    const name = saveNameInput.trim();
+    const platformArr = [...platforms];
+    const tempId = `temp-${Date.now()}`;
+    setSavedSearches((prev) => [...prev, { id: tempId, name, query: query.trim(), platforms: platformArr }]);
+    setShowSaveInput(false);
+    setSaveNameInput("");
+    startTransition(async () => {
+      await saveSearch("influencer", name, query.trim(), platformArr);
+    });
+  }
+
+  function handleDeleteSavedSearch(id: string) {
+    setSavedSearches((prev) => prev.filter((s) => s.id !== id));
+    startTransition(async () => {
+      await deleteSavedSearch(id);
     });
   }
 
@@ -139,6 +174,66 @@ export function InfluencerFinder({
           })}
         </div>
       </form>
+
+      {/* Saved searches bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {savedSearches.map((s) => (
+          <span
+            key={s.id}
+            className="flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-800"
+          >
+            <button
+              type="button"
+              onClick={() => loadSavedSearch(s)}
+              className="font-medium text-zinc-700 hover:text-red-600 dark:text-zinc-300 dark:hover:text-red-400"
+            >
+              {s.name}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDeleteSavedSearch(s.id)}
+              className="ml-0.5 text-zinc-400 hover:text-red-500"
+              aria-label={`Remove ${s.name}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        {!showSaveInput ? (
+          <button
+            type="button"
+            onClick={() => { setShowSaveInput(true); setSaveNameInput(""); }}
+            disabled={!query.trim()}
+            className="flex items-center gap-1 rounded-full border border-dashed border-zinc-300 px-2.5 py-1 text-xs text-zinc-400 hover:border-zinc-400 hover:text-zinc-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-500"
+          >
+            <Bookmark className="h-3 w-3" />
+            Save search
+          </button>
+        ) : (
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleSaveSearch(); }}
+            className="flex items-center gap-1"
+          >
+            <input
+              autoFocus
+              value={saveNameInput}
+              onChange={(e) => setSaveNameInput(e.target.value)}
+              placeholder="Search name…"
+              className="h-7 rounded-md border border-zinc-300 bg-white px-2 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+            />
+            <Button type="submit" size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={!saveNameInput.trim()}>
+              Save
+            </Button>
+            <button
+              type="button"
+              onClick={() => setShowSaveInput(false)}
+              className="text-zinc-400 hover:text-zinc-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </form>
+        )}
+      </div>
 
       {data?.notes && data.notes.length > 0 && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">

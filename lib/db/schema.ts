@@ -187,6 +187,7 @@ export const workspaces = pgTable("workspaces", {
   name: text("name").notNull(),
   airtableToken: text("airtable_token"),
   airtableBaseId: text("airtable_base_id"),
+  followUpDays: integer("follow_up_days").default(4).notNull(),
   createdAt: createdAt(),
 });
 
@@ -614,6 +615,34 @@ export const emailSuppressions = pgTable(
   },
   (t) => [primaryKey({ columns: [t.workspaceId, t.email] })],
 );
+
+/* ─────────────────────── Finder Cache ─────────────────────── */
+
+export const finderCache = pgTable("finder_cache", {
+  id: id(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  cacheKey: text("cache_key").notNull(),
+  results: text("results").notNull(), // JSON string
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("finder_cache_key_idx").on(t.workspaceId, t.cacheKey),
+  index("finder_cache_expires_idx").on(t.expiresAt),
+]);
+
+/* ─────────────────────── Saved Searches ─────────────────────── */
+
+export const savedSearchTypeEnum = pgEnum("saved_search_type", ["influencer", "pr"]);
+
+export const savedSearches = pgTable("saved_searches", {
+  id: id(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  type: savedSearchTypeEnum("type").notNull(),
+  name: text("name").notNull(),
+  query: text("query").notNull(),
+  platforms: text("platforms").array().default([]).notNull(),
+  createdAt: createdAt(),
+}, (t) => [index("saved_searches_workspace_idx").on(t.workspaceId, t.type)]);
 
 /* ─────────────────────── Pitch Templates ─────────────────────── */
 

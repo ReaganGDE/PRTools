@@ -12,6 +12,7 @@ import {
   type InfluencerResult,
 } from "@/lib/integrations/youtube-influencers";
 import { findModashInfluencers, modashConfigured } from "@/lib/integrations/modash";
+import { getCached, setCached, purgeExpiredCache } from "@/lib/finder-cache";
 
 export type InfluencerSearchResult = {
   results: InfluencerResult[];
@@ -24,7 +25,7 @@ export async function searchInfluencers(
   formData: FormData,
 ): Promise<InfluencerSearchResult> {
   await assertSectionAccess("social");
-  await requireSession();
+  const session = await requireSession();
 
   const query = String(formData.get("query") ?? "").trim();
   const platforms = formData.getAll("platforms").map(String);
@@ -34,6 +35,14 @@ export async function searchInfluencers(
   const modashEnabled = modashConfigured(env.MODASH_API_KEY);
 
   if (!query) return { results: [], modashEnabled, youtubeEnabled, notes };
+
+  const cacheKey = `influencer:${query}:${[...platforms].sort().join(",")}`;
+
+  // Check cache first
+  const cached = await getCached<InfluencerResult[]>(session.workspaceId, cacheKey);
+  if (cached) {
+    return { results: cached, modashEnabled, youtubeEnabled, notes: ["Results from cache."] };
+  }
 
   const wantYouTube = platforms.length === 0 || platforms.includes("youtube");
   const wantInstagram = platforms.includes("instagram");
@@ -67,6 +76,10 @@ export async function searchInfluencers(
   const results = settled.flat();
   // Highest engagement first within the combined set.
   results.sort((a, b) => b.engagementRate - a.engagementRate);
+
+  // Store in cache and purge stale entries opportunistically
+  await setCached(session.workspaceId, cacheKey, results);
+  void purgeExpiredCache();
 
   return { results, modashEnabled, youtubeEnabled, notes };
 }
