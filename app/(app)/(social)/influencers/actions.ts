@@ -84,7 +84,7 @@ export async function searchInfluencers(
   return { results, modashEnabled, youtubeEnabled, notes };
 }
 
-export type AddInfluencerResult = { added: boolean; reason?: string };
+export type AddInfluencerResult = { added: boolean; contactId?: string; reason?: string };
 
 export async function addInfluencerContact(
   formData: FormData,
@@ -136,8 +136,9 @@ export async function addInfluencerContact(
     .filter(Boolean)
     .join(" · ");
 
+  const newId = nanoid(16);
   await db.insert(contacts).values({
-    id: nanoid(16),
+    id: newId,
     workspaceId: session.workspaceId,
     type: "influencer",
     name,
@@ -152,5 +153,5 @@ export async function addInfluencerContact(
 
   revalidatePath("/influencers");
   revalidatePath("/contacts");
-  return { added: true };
+  return { added: true, contactId: newId };
 }

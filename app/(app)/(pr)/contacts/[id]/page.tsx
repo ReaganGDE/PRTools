@@ -117,11 +117,20 @@ export default async function ContactDetailPage({
         title={contact.name}
         description={[contact.outlet, contact.beat].filter(Boolean).join(" · ") || undefined}
         actions={
-          <form action={boundDelete}>
-            <Button type="submit" variant="destructive">
-              Delete
-            </Button>
-          </form>
+          <div className="flex items-center gap-2">
+            {contact.type === "influencer" && (
+              <Link href={`/contacts/${contact.id}/influencer-pitch`}>
+                <Button type="button" variant="outline">
+                  Pitch creator
+                </Button>
+              </Link>
+            )}
+            <form action={boundDelete}>
+              <Button type="submit" variant="destructive">
+                Delete
+              </Button>
+            </form>
+          </div>
         }
       />
 

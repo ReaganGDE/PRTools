@@ -3,20 +3,28 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import {
   Search, UserPlus, Check, ExternalLink, Info,
-  Newspaper, Mail, Database, Bookmark, Save, X,
+  Newspaper, Mail, Database, Bookmark, Save, X, Film,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { searchPrContacts, addJournalistContact, type PrFinderResult } from "./actions";
+import {
+  searchPrContacts,
+  addJournalistContact,
+  logCoverageFromFinder,
+  type PrFinderResult,
+} from "./actions";
 import { saveSearch, deleteSavedSearch } from "@/lib/saved-search-actions";
 
 type SavedSearch = { id: string; name: string; query: string; platforms: string[] };
+type MovieOption = { id: string; title: string };
 
 export function PrFinder({
   newsEnabled,
   savedSearches: initialSavedSearches,
+  movies,
 }: {
   newsEnabled: boolean;
   savedSearches: SavedSearch[];
+  movies: MovieOption[];
 }) {
   const [query, setQuery] = useState("");
   const [data, setData] = useState<PrFinderResult | null>(null);
@@ -27,6 +35,9 @@ export function PrFinder({
   const [showSaveName, setShowSaveName] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [isSaving, startSaveTransition] = useTransition();
+
+  const [coverageOpen, setCoverageOpen] = useState<Record<string, boolean>>({});
+  const [coverageLogged, setCoverageLogged] = useState<Record<string, boolean>>({});
 
   function handleDeleteSaved(id: string) {
     setSavedSearches((prev) => prev.filter((s) => s.id !== id));
@@ -59,6 +70,8 @@ export function PrFinder({
       const r = await searchPrContacts(fd);
       setData(r);
       setAdded({});
+      setCoverageOpen({});
+      setCoverageLogged({});
     });
   }
 
@@ -71,6 +84,25 @@ export function PrFinder({
     startTransition(async () => {
       const res = await addJournalistContact(fd);
       setAdded((prev) => ({ ...prev, [name]: res.added ? "done" : "dupe" }));
+    });
+  }
+
+  function toggleCoverage(name: string) {
+    setCoverageOpen((prev) => ({ ...prev, [name]: !prev[name] }));
+  }
+
+  function handleLogCoverage(
+    e: React.FormEvent<HTMLFormElement>,
+    journalistName: string,
+  ) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const res = await logCoverageFromFinder(fd);
+      if (res.ok) {
+        setCoverageLogged((prev) => ({ ...prev, [journalistName]: true }));
+        setCoverageOpen((prev) => ({ ...prev, [journalistName]: false }));
+      }
     });
   }
 
@@ -179,33 +211,109 @@ export function PrFinder({
               {data.discovered.map((j) => {
                 const state = added[j.name];
                 const isDone = state === "done" || j.alreadyInDb;
+                const isLogged = coverageLogged[j.name];
+                const showPanel = coverageOpen[j.name];
                 return (
-                  <div key={j.name} className="flex items-center gap-3 rounded-xl border border-zinc-200/80 bg-white p-3.5 shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{j.name}</span>
-                        {j.outlet && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{j.outlet}</span>}
-                        <span className="text-[10px] text-zinc-400">{j.articleCount} article{j.articleCount === 1 ? "" : "s"}</span>
+                  <div key={j.name} className="rounded-xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900">
+                    <div className="flex items-center gap-3 p-3.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{j.name}</span>
+                          {j.outlet && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{j.outlet}</span>}
+                          <span className="text-[10px] text-zinc-400">{j.articleCount} article{j.articleCount === 1 ? "" : "s"}</span>
+                        </div>
+                        {j.latestHeadline && (
+                          <a href={j.latestUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="mt-0.5 flex items-center gap-1 truncate text-xs text-zinc-500 hover:underline">
+                            {j.latestHeadline}<ExternalLink className="h-2.5 w-2.5 shrink-0" />
+                          </a>
+                        )}
                       </div>
-                      {j.latestHeadline && (
-                        <a href={j.latestUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="mt-0.5 flex items-center gap-1 truncate text-xs text-zinc-500 hover:underline">
-                          {j.latestHeadline}<ExternalLink className="h-2.5 w-2.5 shrink-0" />
-                        </a>
-                      )}
+                      <div className="flex shrink-0 items-center gap-2">
+                        {movies.length > 0 && j.latestHeadline && (
+                          isLogged ? (
+                            <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                              <Check className="h-3.5 w-3.5" /> Logged
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => toggleCoverage(j.name)}
+                              className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
+                                showPanel
+                                  ? "border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300"
+                                  : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400"
+                              }`}
+                            >
+                              <Film className="h-3 w-3" />
+                              Log coverage
+                            </button>
+                          )
+                        )}
+                        {isDone ? (
+                          <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                            <Check className="h-3.5 w-3.5" />{j.alreadyInDb && state !== "done" ? "In DB" : "Added"}
+                          </span>
+                        ) : state === "dupe" ? (
+                          <span className="text-xs text-zinc-400">Already saved</span>
+                        ) : (
+                          <Button type="button" size="sm" variant="outline" disabled={state === "adding"} onClick={() => handleAdd(j.name, j.outlet)}>
+                            <UserPlus className="h-3.5 w-3.5" />{state === "adding" ? "Adding…" : "Add"}
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div className="shrink-0">
-                      {isDone ? (
-                        <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                          <Check className="h-3.5 w-3.5" />{j.alreadyInDb && state !== "done" ? "In DB" : "Added"}
-                        </span>
-                      ) : state === "dupe" ? (
-                        <span className="text-xs text-zinc-400">Already saved</span>
-                      ) : (
-                        <Button type="button" size="sm" variant="outline" disabled={state === "adding"} onClick={() => handleAdd(j.name, j.outlet)}>
-                          <UserPlus className="h-3.5 w-3.5" />{state === "adding" ? "Adding…" : "Add"}
-                        </Button>
-                      )}
-                    </div>
+
+                    {showPanel && (
+                      <form
+                        onSubmit={(e) => handleLogCoverage(e, j.name)}
+                        className="border-t border-zinc-100 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/50"
+                      >
+                        <p className="mb-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">Log this article as film coverage</p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <div>
+                            <label className="mb-1 block text-[11px] text-zinc-500">Film</label>
+                            <select
+                              name="movieId"
+                              required
+                              className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+                            >
+                              <option value="">Select a film…</option>
+                              {movies.map((m) => (
+                                <option key={m.id} value={m.id}>{m.title}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[11px] text-zinc-500">Sentiment</label>
+                            <select
+                              name="sentiment"
+                              className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+                            >
+                              <option value="">— not set —</option>
+                              <option value="positive">Positive</option>
+                              <option value="neutral">Neutral</option>
+                              <option value="negative">Negative</option>
+                            </select>
+                          </div>
+                        </div>
+                        <input type="hidden" name="headline" value={j.latestHeadline ?? ""} />
+                        <input type="hidden" name="url" value={j.latestUrl ?? ""} />
+                        <input type="hidden" name="outlet" value={j.outlet ?? ""} />
+                        {j.publishedAt && <input type="hidden" name="publishedAt" value={j.publishedAt} />}
+                        <div className="mt-2 flex items-center gap-2">
+                          <Button type="submit" size="sm" disabled={isPending}>
+                            Save coverage
+                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => toggleCoverage(j.name)}
+                            className="text-xs text-zinc-400 hover:text-zinc-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    )}
                   </div>
                 );
               })}

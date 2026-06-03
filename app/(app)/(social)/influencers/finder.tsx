@@ -53,6 +53,7 @@ export function InfluencerFinder({
   const [data, setData] = useState<InfluencerSearchResult | null>(null);
   const [isPending, startTransition] = useTransition();
   const [added, setAdded] = useState<Record<string, "adding" | "done" | "dupe">>({});
+  const [addedContactIds, setAddedContactIds] = useState<Record<string, string>>({});
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(initialSavedSearches);
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [saveNameInput, setSaveNameInput] = useState("");
@@ -101,6 +102,9 @@ export function InfluencerFinder({
         ...prev,
         [key]: res.added ? "done" : "dupe",
       }));
+      if (res.added && res.contactId) {
+        setAddedContactIds((prev) => ({ ...prev, [key]: res.contactId! }));
+      }
     });
   }
 
@@ -323,11 +327,21 @@ export function InfluencerFinder({
                 </div>
               </div>
 
-              <div className="shrink-0">
+              <div className="flex shrink-0 items-center gap-2">
                 {state === "done" ? (
-                  <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                    <Check className="h-3.5 w-3.5" /> Added
-                  </span>
+                  <>
+                    <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                      <Check className="h-3.5 w-3.5" /> Added
+                    </span>
+                    {addedContactIds[key] && (
+                      <a
+                        href={`/contacts/${addedContactIds[key]}/influencer-pitch`}
+                        className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-600 hover:border-zinc-300 hover:text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400"
+                      >
+                        Pitch
+                      </a>
+                    )}
+                  </>
                 ) : state === "dupe" ? (
                   <span className="text-xs text-zinc-400">Already saved</span>
                 ) : (

@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
-import { contacts } from "@/lib/db/schema";
+import { contacts, movies, movieCoverages } from "@/lib/db/schema";
 import { requireSession, requireSessionWithCap } from "@/lib/auth-helpers";
 import { assertSectionAccess } from "@/lib/tool-access";
 import { env } from "@/lib/env";
@@ -184,4 +184,59 @@ export async function addJournalistContact(
   revalidatePath("/pr-finder");
   revalidatePath("/contacts");
   return { added: true };
+}
+
+/* ──────── Coverage logging from the finder ──────── */
+
+export type MovieOption = { id: string; title: string };
+
+export async function listMoviesForFinder(): Promise<MovieOption[]> {
+  await assertSectionAccess("pr");
+  const session = await requireSession();
+  return db
+    .select({ id: movies.id, title: movies.title })
+    .from(movies)
+    .where(eq(movies.workspaceId, session.workspaceId))
+    .orderBy(movies.title);
+}
+
+export type LogCoverageResult = { ok: boolean };
+
+export async function logCoverageFromFinder(
+  formData: FormData,
+): Promise<LogCoverageResult> {
+  const session = await requireSession();
+  await assertSectionAccess("pr");
+
+  const movieId = String(formData.get("movieId") ?? "").trim();
+  if (!movieId) return { ok: false };
+
+  const headline = String(formData.get("headline") ?? "").trim() || null;
+  const url = String(formData.get("url") ?? "").trim() || null;
+  const outlet = String(formData.get("outlet") ?? "").trim() || null;
+  const publishedAtRaw = String(formData.get("publishedAt") ?? "").trim();
+  const publishedAt = publishedAtRaw ? new Date(publishedAtRaw) : null;
+  const sentiment =
+    (formData.get("sentiment") as "positive" | "neutral" | "negative" | null) ||
+    null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+  const contactId = String(formData.get("contactId") ?? "").trim() || null;
+
+  await db.insert(movieCoverages).values({
+    id: nanoid(16),
+    workspaceId: session.workspaceId,
+    movieId,
+    contactId,
+    outlet,
+    headline,
+    url,
+    publishedAt,
+    sentiment,
+    notes,
+    addedBy: session.userId,
+  });
+
+  revalidatePath(`/movies/${movieId}`);
+  revalidatePath("/dashboard");
+  return { ok: true };
 }
