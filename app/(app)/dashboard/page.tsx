@@ -165,6 +165,43 @@ export default async function DashboardPage() {
     sent: number;
   }[];
 
+  // Follow-ups due — contacts who were sent a screener 4+ days ago and have
+  // not replied to any pitch for that film. Prime candidates for a nudge.
+  const FOLLOWUP_DAYS = 4;
+  const followupCutoff = new Date(
+    now.getTime() - FOLLOWUP_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  const followUpsDue = (await db.execute(sql`
+    SELECT mc.movie_id AS "movieId", m.title,
+           mc.contact_id AS "contactId", c.name AS "contactName",
+           c.outlet, c.email,
+           mc.screener_sent_at AS "screenerSentAt"
+    FROM movie_contacts mc
+    JOIN movies m ON m.id = mc.movie_id
+    JOIN contacts c ON c.id = mc.contact_id
+    WHERE mc.workspace_id = ${wsId}
+      AND mc.screener_sent_at IS NOT NULL
+      AND mc.screener_sent_at < ${followupCutoff}
+      AND NOT EXISTS (
+        SELECT 1 FROM sends s
+        JOIN campaigns ca ON ca.id = s.campaign_id
+        WHERE s.contact_id = mc.contact_id
+          AND ca.movie_id = mc.movie_id
+          AND s.replied_at IS NOT NULL
+      )
+      ${brandClause}
+    ORDER BY mc.screener_sent_at ASC
+    LIMIT 10
+  `)) as unknown as {
+    movieId: string;
+    title: string;
+    contactId: string;
+    contactName: string;
+    outlet: string | null;
+    email: string | null;
+    screenerSentAt: string;
+  }[];
+
   // Next release(s) — if a brand is active, just that brand's next upcoming
   // movie; if "all", show one upcoming movie from each brand.
   type UpcomingMovie = {
@@ -295,6 +332,53 @@ export default async function DashboardPage() {
                         </span>
                       </span>
                       <ChevronRight className="h-4 w-4 shrink-0 text-amber-400 opacity-0 transition-opacity group-hover:opacity-100" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {/* Follow-ups due */}
+        {followUpsDue.length > 0 && (
+          <div>
+            <SectionHeading
+              icon={<Clock className="h-4 w-4" />}
+              label="Follow-ups due"
+            />
+            <ul className="space-y-2">
+              {followUpsDue.map((f) => {
+                const sentAt = new Date(f.screenerSentAt);
+                const days = Math.floor(
+                  (now.getTime() - sentAt.getTime()) / (24 * 60 * 60 * 1000),
+                );
+                return (
+                  <li key={`${f.movieId}-${f.contactId}`}>
+                    <Link
+                      href={`/movies/${f.movieId}/pitch`}
+                      className="group flex items-center gap-3 rounded-xl border border-blue-200/70 bg-blue-50/50 p-3 text-sm transition-all hover:shadow-sm dark:border-blue-900/30 dark:bg-blue-950/20"
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400">
+                        <Clock className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                          {f.contactName}
+                        </span>
+                        {f.outlet && (
+                          <span className="ml-2 text-xs text-zinc-500">
+                            {f.outlet}
+                          </span>
+                        )}
+                        <span className="block truncate text-xs text-zinc-500">
+                          {f.title}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-xs font-medium text-blue-700 dark:text-blue-400">
+                        no reply · {days}d ago
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-blue-400 opacity-0 transition-opacity group-hover:opacity-100" />
                     </Link>
                   </li>
                 );
