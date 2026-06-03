@@ -45,4 +45,7 @@ export const env = {
   INNGEST_SIGNING_KEY: optional("INNGEST_SIGNING_KEY"),
   ONEUP_API_KEY: optional("ONEUP_API_KEY"),
   BLOB_READ_WRITE_TOKEN: optional("BLOB_READ_WRITE_TOKEN"),
+  // Influencer discovery for Instagram/TikTok (paid: Modash / HypeAuditor).
+  // When unset, the influencer finder only searches YouTube.
+  MODASH_API_KEY: optional("MODASH_API_KEY"),
 };

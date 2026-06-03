@@ -53,6 +53,8 @@ export const contactSourceEnum = pgEnum("contact_source", [
   "manual",
   "ig_discover",
   "reddit_discover",
+  "youtube_discover",
+  "news_discover",
 ]);
 
 export const templateChannelEnum = pgEnum("template_channel", ["dm", "email"]);

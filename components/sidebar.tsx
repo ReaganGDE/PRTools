@@ -15,6 +15,8 @@ import {
   Film,
   ChevronRight,
   MessageCircle,
+  Sparkles,
+  Radar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandSwitcher, type BrandOption } from "@/components/brand-switcher";
@@ -39,6 +41,7 @@ const NAV_GROUPS: {
     section: "pr",
     items: [
       { href: "/contacts", label: "Contacts", icon: Users },
+      { href: "/pr-finder", label: "Find contacts", icon: Radar },
       { href: "/outreach", label: "Outreach", icon: Send },
       { href: "/email", label: "Email", icon: Mail },
       { href: "/inbox", label: "PR Inbox", icon: Inbox },
@@ -49,6 +52,7 @@ const NAV_GROUPS: {
     section: "social",
     items: [
       { href: "/social", label: "Social", icon: Megaphone },
+      { href: "/influencers", label: "Influencers", icon: Sparkles },
       { href: "/sentiment", label: "Sentiment", icon: BarChart3 },
       { href: "/dms", label: "DMs", icon: MessageCircle },
     ],
