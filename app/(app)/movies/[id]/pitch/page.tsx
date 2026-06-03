@@ -8,6 +8,7 @@ import { requireSession } from "@/lib/auth-helpers";
 import { requireSectionAccess } from "@/lib/tool-access";
 import { PageHeader } from "@/components/page-header";
 import { PitchForm } from "./pitch-form";
+import { listPitchTemplates } from "./template-actions";
 
 function defaultBody(): string {
   return [
@@ -37,7 +38,7 @@ export default async function PitchPage({
   await requireSectionAccess("pr");
   const session = await requireSession();
 
-  const [[movie], linked] = await Promise.all([
+  const [[movie], linked, templates] = await Promise.all([
     db
       .select()
       .from(movies)
@@ -57,6 +58,7 @@ export default async function PitchPage({
       .innerJoin(contacts, eq(movieContacts.contactId, contacts.id))
       .where(eq(movieContacts.movieId, id))
       .orderBy(contacts.name),
+    listPitchTemplates(id),
   ]);
 
   if (!movie) notFound();
@@ -106,6 +108,7 @@ export default async function PitchPage({
             recipients={recipients}
             defaultSubject={defaultSubject}
             defaultBody={defaultBody()}
+            templates={templates}
           />
         )}
       </div>

@@ -15,6 +15,10 @@ import {
   Send,
   UserPlus,
   X,
+  Newspaper,
+  ThumbsUp,
+  Minus,
+  ThumbsDown,
 } from "lucide-react";
 import { db } from "@/lib/db";
 import {
@@ -24,6 +28,7 @@ import {
   movieContacts,
   contacts,
   contactLists,
+  movieCoverages,
 } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
@@ -35,6 +40,7 @@ import {
   removeMovieContact,
   toggleScreenerSent,
 } from "./press-actions";
+import { addMovieCoverage, removeMovieCoverage } from "./coverage-actions";
 
 export default async function MovieDetailPage({
   params,
@@ -44,7 +50,7 @@ export default async function MovieDetailPage({
   const { id } = await params;
   const session = await requireSession();
 
-  const [[row], moviePosts, pressContacts, allContacts] = await Promise.all([
+  const [[row], moviePosts, pressContacts, allContacts, coverages] = await Promise.all([
     db
       .select({ movie: movies, brandName: brands.name, brandColor: brands.color })
       .from(movies)
@@ -80,6 +86,11 @@ export default async function MovieDetailPage({
       .from(contacts)
       .where(eq(contacts.workspaceId, session.workspaceId))
       .orderBy(contacts.name),
+    db
+      .select()
+      .from(movieCoverages)
+      .where(eq(movieCoverages.movieId, id))
+      .orderBy(desc(movieCoverages.publishedAt)),
   ]);
 
   const lists = await db
@@ -377,6 +388,117 @@ export default async function MovieDetailPage({
                   first.
                 </p>
               )}
+            </Section>
+
+            {/* Press coverage */}
+            <Section title={`Coverage${coverages.length > 0 ? ` (${coverages.length})` : ""}`}>
+              {coverages.length > 0 && (
+                <ul className="mb-4 divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {coverages.map((cov) => (
+                    <li key={cov.id} className="flex items-start gap-3 py-3 text-sm">
+                      <div className="mt-0.5 shrink-0">
+                        {cov.sentiment === "positive" ? (
+                          <ThumbsUp className="h-3.5 w-3.5 text-emerald-500" />
+                        ) : cov.sentiment === "negative" ? (
+                          <ThumbsDown className="h-3.5 w-3.5 text-red-500" />
+                        ) : (
+                          <Minus className="h-3.5 w-3.5 text-zinc-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {cov.headline ? (
+                          cov.url ? (
+                            <a
+                              href={cov.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium hover:underline"
+                            >
+                              {cov.headline}
+                            </a>
+                          ) : (
+                            <span className="font-medium">{cov.headline}</span>
+                          )
+                        ) : cov.url ? (
+                          <a
+                            href={cov.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="truncate text-xs text-zinc-500 hover:underline"
+                          >
+                            {cov.url}
+                          </a>
+                        ) : null}
+                        <p className="text-xs text-zinc-500">
+                          {[
+                            cov.outlet,
+                            cov.publishedAt
+                              ? cov.publishedAt.toLocaleDateString(undefined, {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                        {cov.notes && (
+                          <p className="mt-0.5 text-xs text-zinc-400">{cov.notes}</p>
+                        )}
+                      </div>
+                      <form action={removeMovieCoverage.bind(null, id, cov.id)}>
+                        <button
+                          type="submit"
+                          title="Remove"
+                          className="shrink-0 rounded p-1 text-zinc-400 hover:text-red-500"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <form action={addMovieCoverage.bind(null, id)} className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    name="outlet"
+                    placeholder="Outlet (e.g. Variety)"
+                    className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+                  />
+                  <input
+                    name="publishedAt"
+                    type="date"
+                    className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+                  />
+                </div>
+                <input
+                  name="headline"
+                  placeholder="Headline"
+                  className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+                />
+                <div className="flex gap-2">
+                  <input
+                    name="url"
+                    type="url"
+                    placeholder="URL (optional)"
+                    className="h-8 flex-1 rounded-md border border-zinc-200 bg-white px-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+                  />
+                  <select
+                    name="sentiment"
+                    className="h-8 rounded-md border border-zinc-200 bg-white px-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+                  >
+                    <option value="">Sentiment</option>
+                    <option value="positive">Positive</option>
+                    <option value="neutral">Neutral</option>
+                    <option value="negative">Negative</option>
+                  </select>
+                  <Button type="submit" size="sm" variant="outline">
+                    <Newspaper className="h-3.5 w-3.5" /> Log
+                  </Button>
+                </div>
+              </form>
             </Section>
 
             {/* Recent posts for this movie */}

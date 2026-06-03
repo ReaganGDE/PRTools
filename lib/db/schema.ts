@@ -610,6 +610,51 @@ export const emailSuppressions = pgTable(
   (t) => [primaryKey({ columns: [t.workspaceId, t.email] })],
 );
 
+/* ─────────────────────── Pitch Templates ─────────────────────── */
+
+export const pitchTemplates = pgTable("pitch_templates", {
+  id: id(),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  createdBy: text("created_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: createdAt(),
+});
+
+/* ─────────────────────── Movie Coverages ─────────────────────── */
+
+export const movieCoverages = pgTable(
+  "movie_coverages",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    movieId: text("movie_id")
+      .notNull()
+      .references(() => movies.id, { onDelete: "cascade" }),
+    contactId: text("contact_id").references(() => contacts.id, {
+      onDelete: "set null",
+    }),
+    outlet: text("outlet"),
+    headline: text("headline"),
+    url: text("url"),
+    publishedAt: timestamp("published_at"),
+    sentiment: sentimentLabelEnum("sentiment"),
+    notes: text("notes"),
+    addedBy: text("added_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("movie_coverages_movie_idx").on(t.movieId)],
+);
+
 /* ─────────────────────── Relations ─────────────────────── */
 
 export const workspacesRelations = relations(workspaces, ({ many }) => ({

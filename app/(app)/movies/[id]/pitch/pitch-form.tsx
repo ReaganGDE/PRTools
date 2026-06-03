@@ -1,8 +1,13 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Send, CheckCircle2, AlertTriangle, Info } from "lucide-react";
+import { Send, CheckCircle2, AlertTriangle, Info, BookMarked, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { sendFilmPitch, type PitchResult } from "./actions";
+import {
+  savePitchTemplate,
+  deletePitchTemplate,
+  type PitchTemplate,
+} from "./template-actions";
 
 type Recipient = {
   id: string;
@@ -29,11 +34,13 @@ export function PitchForm({
   recipients,
   defaultSubject,
   defaultBody,
+  templates: initialTemplates,
 }: {
   movieId: string;
   recipients: Recipient[];
   defaultSubject: string;
   defaultBody: string;
+  templates: PitchTemplate[];
 }) {
   const emailable = recipients.filter((r) => r.email);
   const [selected, setSelected] = useState<Set<string>>(
@@ -46,6 +53,12 @@ export function PitchForm({
   const [result, setResult] = useState<PitchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [templates, setTemplates] = useState<PitchTemplate[]>(initialTemplates);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [isSavingTemplate, startSaveTransition] = useTransition();
+  const [isDeletingTemplate, startDeleteTransition] = useTransition();
+
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -53,6 +66,13 @@ export function PitchForm({
       else next.add(id);
       return next;
     });
+  }
+
+  function loadTemplate(templateId: string) {
+    const t = templates.find((t) => t.id === templateId);
+    if (!t) return;
+    setSubject(t.subject);
+    setBody(t.body);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -71,6 +91,26 @@ export function PitchForm({
       } catch (err) {
         setError((err as Error).message);
       }
+    });
+  }
+
+  function handleSaveTemplate(e: React.FormEvent) {
+    e.preventDefault();
+    const fd = new FormData();
+    fd.set("name", templateName);
+    fd.set("subject", subject);
+    fd.set("body", body);
+    startSaveTransition(async () => {
+      await savePitchTemplate(movieId, fd);
+      setShowSaveTemplate(false);
+      setTemplateName("");
+    });
+  }
+
+  function handleDeleteTemplate(templateId: string) {
+    startDeleteTransition(async () => {
+      await deletePitchTemplate(movieId, templateId);
+      setTemplates((prev) => prev.filter((t) => t.id !== templateId));
     });
   }
 
@@ -120,6 +160,98 @@ export function PitchForm({
           })}
         </div>
       </section>
+
+      {/* Template bar */}
+      <div className="flex items-center gap-2">
+        {templates.length > 0 && (
+          <>
+            <BookMarked className="h-4 w-4 shrink-0 text-zinc-400" />
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value) loadTemplate(e.target.value);
+                e.target.value = "";
+              }}
+              className="h-8 flex-1 rounded-md border border-zinc-200 bg-white px-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+            >
+              <option value="" disabled>
+                Load a template…
+              </option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowSaveTemplate((v) => !v)}
+          className="ml-auto flex shrink-0 items-center gap-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
+        >
+          <Save className="h-3 w-3" /> Save as template
+        </button>
+      </div>
+
+      {showSaveTemplate && (
+        <form
+          onSubmit={handleSaveTemplate}
+          className="flex gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          <input
+            autoFocus
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            placeholder="Template name…"
+            className="h-8 flex-1 rounded-md border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+          />
+          <Button
+            type="submit"
+            size="sm"
+            variant="outline"
+            disabled={!templateName.trim() || isSavingTemplate}
+          >
+            {isSavingTemplate ? "Saving…" : "Save"}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setShowSaveTemplate(false)}
+          >
+            Cancel
+          </Button>
+        </form>
+      )}
+
+      {templates.length > 0 && (
+        <div className="divide-y divide-zinc-100 rounded-lg border border-zinc-200/80 bg-white dark:divide-zinc-800 dark:border-zinc-800/60 dark:bg-zinc-900">
+          {templates.map((t) => (
+            <div key={t.id} className="flex items-center gap-2 px-3 py-2">
+              <button
+                type="button"
+                onClick={() => loadTemplate(t.id)}
+                className="min-w-0 flex-1 text-left text-sm hover:text-red-600 dark:hover:text-red-400"
+              >
+                {t.name}
+              </button>
+              <span className="truncate text-xs text-zinc-400 max-w-[180px]">
+                {t.subject}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleDeleteTemplate(t.id)}
+                disabled={isDeletingTemplate}
+                title="Delete template"
+                className="shrink-0 rounded p-1 text-zinc-400 hover:text-red-500"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Subject */}
       <div className="space-y-1.5">
