@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import {
   ChevronLeft,
   Film,
@@ -29,6 +29,8 @@ import {
   contacts,
   contactLists,
   movieCoverages,
+  campaigns,
+  sends,
 } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
@@ -98,6 +100,25 @@ export default async function MovieDetailPage({
     .from(contactLists)
     .where(eq(contactLists.workspaceId, session.workspaceId))
     .orderBy(contactLists.name);
+
+  // Aggregate pitch performance across every pitch campaign for this film.
+  const pitchStats = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      sent: sql<number>`count(*) filter (where ${sends.sentAt} is not null)::int`,
+      opened: sql<number>`count(*) filter (where ${sends.openedAt} is not null)::int`,
+      clicked: sql<number>`count(*) filter (where ${sends.clickedAt} is not null)::int`,
+      replied: sql<number>`count(*) filter (where ${sends.repliedAt} is not null)::int`,
+    })
+    .from(sends)
+    .innerJoin(campaigns, eq(sends.campaignId, campaigns.id))
+    .where(
+      and(
+        eq(campaigns.movieId, id),
+        eq(campaigns.workspaceId, session.workspaceId),
+      ),
+    )
+    .then((r) => r[0]);
 
   if (!row) notFound();
   const m = row.movie;
@@ -269,6 +290,45 @@ export default async function MovieDetailPage({
                 <CreditRow label="Production co." value={m.productionCompany} />
                 <CreditRow label="Comp titles" value={m.compTitles} />
                 <CreditRow label="Copyright" value={m.copyrightLine} />
+              </Section>
+            )}
+
+            {/* Pitch performance */}
+            {pitchStats && pitchStats.total > 0 && (
+              <Section title="Pitch performance">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <PitchStat label="Sent" value={pitchStats.sent} />
+                  <PitchStat
+                    label="Opened"
+                    value={pitchStats.opened}
+                    pct={
+                      pitchStats.sent > 0
+                        ? Math.round((pitchStats.opened / pitchStats.sent) * 100)
+                        : null
+                    }
+                    tone="blue"
+                  />
+                  <PitchStat
+                    label="Clicked"
+                    value={pitchStats.clicked}
+                    pct={
+                      pitchStats.sent > 0
+                        ? Math.round((pitchStats.clicked / pitchStats.sent) * 100)
+                        : null
+                    }
+                    tone="violet"
+                  />
+                  <PitchStat
+                    label="Replied"
+                    value={pitchStats.replied}
+                    pct={
+                      pitchStats.sent > 0
+                        ? Math.round((pitchStats.replied / pitchStats.sent) * 100)
+                        : null
+                    }
+                    tone="emerald"
+                  />
+                </div>
               </Section>
             )}
 
@@ -570,6 +630,36 @@ function Section({
         {children}
       </div>
     </section>
+  );
+}
+
+function PitchStat({
+  label,
+  value,
+  pct,
+  tone = "zinc",
+}: {
+  label: string;
+  value: number;
+  pct?: number | null;
+  tone?: "zinc" | "blue" | "violet" | "emerald";
+}) {
+  const toneClasses: Record<string, string> = {
+    zinc: "text-zinc-900 dark:text-zinc-100",
+    blue: "text-blue-600 dark:text-blue-400",
+    violet: "text-violet-600 dark:text-violet-400",
+    emerald: "text-emerald-600 dark:text-emerald-400",
+  };
+  return (
+    <div className="rounded-lg border border-zinc-200/80 p-3 dark:border-zinc-800/60">
+      <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
+      <div className={cn("mt-1 text-2xl font-semibold tabular-nums", toneClasses[tone])}>
+        {value}
+      </div>
+      {pct != null && (
+        <div className="text-xs text-zinc-400">{pct}% of sent</div>
+      )}
+    </div>
   );
 }
 

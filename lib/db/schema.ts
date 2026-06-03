@@ -434,6 +434,9 @@ export const campaigns = pgTable("campaigns", {
   listId: text("list_id").references(() => contactLists.id, {
     onDelete: "set null",
   }),
+  movieId: text("movie_id").references(() => movies.id, {
+    onDelete: "set null",
+  }),
   status: campaignStatusEnum("status").default("draft").notNull(),
   scheduledAt: timestamp("scheduled_at"),
   createdBy: text("created_by").references(() => users.id),

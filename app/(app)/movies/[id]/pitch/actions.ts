@@ -94,6 +94,7 @@ export async function sendFilmPitch(
       workspaceId: session.workspaceId,
       name: `Pitch: ${movie.title}`,
       type: "email",
+      movieId,
       createdBy: session.userId,
       status: "running",
     })
