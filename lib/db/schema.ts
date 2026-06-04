@@ -287,6 +287,7 @@ export const movies = pgTable(
     castList: text("cast_list"),
     producer: text("producer"),
     copyrightLine: text("copyright_line"),
+    coverageReportToken: text("coverage_report_token").unique(),
     manageSocials: boolean("manage_socials").default(true).notNull(),
     status: movieStatusEnum("status").default("in_production").notNull(),
     airtableRecordId: text("airtable_record_id"),

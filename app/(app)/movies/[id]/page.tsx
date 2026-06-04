@@ -129,11 +129,18 @@ export default async function MovieDetailPage({
         title={m.title}
         description={m.tagline ?? m.logline ?? undefined}
         actions={
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/movies/${m.id}/edit`}>
-              <Pencil className="h-3.5 w-3.5" /> Edit
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/movies/${m.id}/coverage-report`}>
+                Coverage report
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/movies/${m.id}/edit`}>
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </Link>
+            </Button>
+          </div>
         }
       />
       <div className="mx-auto max-w-6xl p-8">
