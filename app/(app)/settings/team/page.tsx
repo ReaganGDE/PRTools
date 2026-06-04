@@ -2,7 +2,6 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { listInvites } from "@/lib/invites";
-import { env } from "@/lib/env";
 import { requireSession } from "@/lib/auth-helpers";
 import { InviteLink } from "./invite-link";
 import {
@@ -50,6 +49,11 @@ export default async function TeamPage() {
 
   const invites = await listInvites(wsId);
   const pending = invites.filter((i) => !i.acceptedAt);
+
+  const baseUrl =
+    process.env.AUTH_URL ??
+    process.env.NEXTAUTH_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
 
   const canInvite = can(session.role, "team.invite");
   const canChangeRole = can(session.role, "team.role.change");
@@ -266,7 +270,7 @@ export default async function TeamPage() {
                         expires {i.expiresAt.toLocaleDateString()}
                       </span>
                       {canInvite ? (
-                        <InviteLink url={`${env.AUTH_URL}/invite/${i.token}`} />
+                        <InviteLink url={`${baseUrl}/invite/${i.token}`} />
                       ) : null}
                       {canInvite ? (
                         <form action={revokePendingInvite.bind(null, i.id)}>
