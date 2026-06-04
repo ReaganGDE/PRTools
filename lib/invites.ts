@@ -76,6 +76,44 @@ export async function acceptInvite(args: { token: string; userId: string }) {
   if (invite.expiresAt < new Date())
     return { ok: false as const, error: "Invite expired" };
 
+  // Load the accepting user so we can guard against two foot-guns:
+  //  1. Accepting an invite meant for a different email (would hijack the row).
+  //  2. Accepting while already in a workspace — most importantly, an owner/
+  //     admin clicking the link in their own browser and getting demoted to
+  //     the invite's (lower) role.
+  const [user] = await db
+    .select({ email: users.email, workspaceId: users.workspaceId })
+    .from(users)
+    .where(eq(users.id, args.userId));
+
+  if (!user) return { ok: false as const, error: "Account not found" };
+
+  if (
+    user.email &&
+    user.email.toLowerCase() !== invite.email.toLowerCase()
+  ) {
+    return {
+      ok: false as const,
+      error: `This invite was sent to ${invite.email}. You're signed in as ${user.email}. Sign in with the invited address to accept.`,
+    };
+  }
+
+  if (user.workspaceId) {
+    if (user.workspaceId === invite.workspaceId) {
+      // Already a member of this workspace — nothing to do, don't change role.
+      await db
+        .update(workspaceInvites)
+        .set({ acceptedAt: new Date() })
+        .where(eq(workspaceInvites.id, invite.id));
+      return { ok: true as const, workspaceId: invite.workspaceId };
+    }
+    return {
+      ok: false as const,
+      error:
+        "You already belong to a workspace. Leave it before accepting a new invite.",
+    };
+  }
+
   await db
     .update(users)
     .set({ workspaceId: invite.workspaceId, role: invite.role })
