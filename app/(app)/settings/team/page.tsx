@@ -2,7 +2,9 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { listInvites } from "@/lib/invites";
+import { env } from "@/lib/env";
 import { requireSession } from "@/lib/auth-helpers";
+import { InviteLink } from "./invite-link";
 import {
   can,
   ROLE_LABELS,
@@ -181,7 +183,8 @@ export default async function TeamPage() {
           <CardHeader>
             <CardTitle>Invite someone</CardTitle>
             <CardDescription>
-              They&apos;ll receive a magic-link email.
+              They&apos;ll get an email — or copy the invite link below and send
+              it yourself.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -240,11 +243,17 @@ export default async function TeamPage() {
               <CardTitle>Pending invites ({pending.length})</CardTitle>
             </CardHeader>
             <CardContent>
+              <p className="mb-3 text-xs text-zinc-500">
+                If the invite email doesn&apos;t arrive (common while the
+                sending domain is still unverified in Resend), use{" "}
+                <strong>Copy link</strong> and send it to the person directly.
+                They&apos;ll sign in and land in this workspace.
+              </p>
               <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
                 {pending.map((i) => (
                   <li
                     key={i.id}
-                    className="flex items-center justify-between py-2 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm"
                   >
                     <div>
                       <span>{i.email}</span>
@@ -256,6 +265,9 @@ export default async function TeamPage() {
                       <span className="text-xs text-zinc-500">
                         expires {i.expiresAt.toLocaleDateString()}
                       </span>
+                      {canInvite ? (
+                        <InviteLink url={`${env.AUTH_URL}/invite/${i.token}`} />
+                      ) : null}
                       {canInvite ? (
                         <form action={revokePendingInvite.bind(null, i.id)}>
                           <Button

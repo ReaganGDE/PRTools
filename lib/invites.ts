@@ -40,16 +40,28 @@ export async function createInvite(args: {
     .where(eq(workspaces.id, args.workspaceId));
 
   const url = `${env.AUTH_URL}/invite/${token}`;
-  await resend().emails.send({
-    from: env.EMAIL_FROM,
-    to: args.email,
-    subject: `You're invited to ${ws?.name ?? "a workspace"}`,
-    html: `<p>You've been invited to join <strong>${ws?.name}</strong> on Influencer & PR Tracker as <strong>${role}</strong>.</p>
-           <p><a href="${url}">Accept the invite</a></p>
-           <p>This link expires in ${INVITE_TTL_DAYS} days.</p>`,
-  });
 
-  return invite;
+  // Best-effort email. If Resend is in sandbox mode (unverified domain), it
+  // only delivers to the account owner's own address, so invites to other
+  // inboxes silently never arrive. We don't want that to discard the invite —
+  // the link is always copyable from the Team page, so swallow send errors and
+  // report whether delivery was actually attempted successfully.
+  let emailed = false;
+  try {
+    await resend().emails.send({
+      from: env.EMAIL_FROM,
+      to: args.email,
+      subject: `You're invited to ${ws?.name ?? "a workspace"}`,
+      html: `<p>You've been invited to join <strong>${ws?.name}</strong> on Influencer & PR Tracker as <strong>${role}</strong>.</p>
+             <p><a href="${url}">Accept the invite</a></p>
+             <p>This link expires in ${INVITE_TTL_DAYS} days.</p>`,
+    });
+    emailed = true;
+  } catch (err) {
+    console.error("createInvite: failed to send invite email", err);
+  }
+
+  return { ...invite, url, emailed };
 }
 
 export async function acceptInvite(args: { token: string; userId: string }) {
