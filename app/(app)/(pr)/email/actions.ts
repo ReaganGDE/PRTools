@@ -235,6 +235,7 @@ export async function sendCampaign(campaignId: string) {
       const result = await client.emails.send({
         from: env.EMAIL_FROM,
         to: m.email,
+        ...(env.EMAIL_REPLY_TO ? { replyTo: env.EMAIL_REPLY_TO } : {}),
         subject: subj,
         html,
         headers: {

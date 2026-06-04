@@ -17,6 +17,8 @@ import {
   MessageCircle,
   Sparkles,
   Radar,
+  Clapperboard,
+  Workflow,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandSwitcher, type BrandOption } from "@/components/brand-switcher";
@@ -43,7 +45,9 @@ const NAV_GROUPS: {
       { href: "/contacts", label: "Contacts", icon: Users },
       { href: "/pr-finder", label: "Find contacts", icon: Radar },
       { href: "/outreach", label: "Outreach", icon: Send },
+      { href: "/sequences", label: "Sequences", icon: Workflow },
       { href: "/email", label: "Email", icon: Mail },
+      { href: "/screeners", label: "Screeners", icon: Clapperboard },
       { href: "/pitch-report", label: "Pitch report", icon: BarChart3 },
       { href: "/inbox", label: "PR Inbox", icon: Inbox },
     ],

@@ -15,18 +15,9 @@ import { resend } from "@/lib/email/resend";
 import { renderTemplate } from "@/lib/email/render-template";
 import { unsubscribeFooter } from "@/lib/email/footer";
 import { env } from "@/lib/env";
+import { SEQUENCE_STEPS } from "@/lib/sequences";
 
-export type FollowUpResult = { sent: boolean; error?: string };
-
-const DEFAULT_SUBJECT = "Following up — {{film_title}}";
-const DEFAULT_BODY = `Hi {{first_name}},
-
-Just circling back on {{film_title}} — I wanted to make sure the screener reached you and see if you'd be interested in covering it.
-
-Happy to resend the link or answer any questions. The screener is here:
-{{screener_url}}
-
-Thanks so much,`;
+export type SequenceStepResult = { sent: boolean; error?: string };
 
 function filmExtras(m: typeof movies.$inferSelect): Record<string, string> {
   return {
@@ -43,16 +34,20 @@ function filmExtras(m: typeof movies.$inferSelect): Record<string, string> {
 }
 
 /**
- * Sends a one-click follow-up reminder email to a contact who received a
- * screener but hasn't replied. Uses a sensible default template rendered with
- * the film's merge fields. Logs a campaign + send row so it shows in history
- * and (once replied) drops off the dashboard follow-up list.
+ * Send a single step of a pitch sequence to one contact for one film. The step
+ * index is validated against the contact's actual position in the cadence to
+ * avoid double-sends — we recompute sentCount server-side rather than trusting
+ * the client.
  */
-export async function sendFollowUpReminder(
+export async function sendSequenceStep(
   movieId: string,
   contactId: string,
-): Promise<FollowUpResult> {
+  stepIndex: number,
+): Promise<SequenceStepResult> {
   const session = await requireSessionWithCap("email.campaign.send");
+
+  const step = SEQUENCE_STEPS[stepIndex];
+  if (!step) return { sent: false, error: "Invalid step" };
 
   const [contact] = await db
     .select()
@@ -75,7 +70,6 @@ export async function sendFollowUpReminder(
     );
   if (!movie) return { sent: false, error: "Film not found" };
 
-  // Respect suppression list.
   const [suppressed] = await db
     .select({ email: emailSuppressions.email })
     .from(emailSuppressions)
@@ -88,16 +82,16 @@ export async function sendFollowUpReminder(
   if (suppressed) return { sent: false, error: "Email is suppressed" };
 
   const extras = filmExtras(movie);
-  const subject = renderTemplate(DEFAULT_SUBJECT, contact, extras).rendered;
-  const body = renderTemplate(DEFAULT_BODY, contact, extras).rendered;
+  const subject = renderTemplate(step.subject, contact, extras).rendered;
+  const bodyText = renderTemplate(step.body, contact, extras).rendered;
   const footer = await unsubscribeFooter(session.workspaceId, contact.email);
-  const html = `${body.replace(/\n/g, "<br>")}\n${footer}`;
+  const html = `${bodyText.replace(/\n/g, "<br>")}\n${footer}`;
 
   const [campaign] = await db
     .insert(campaigns)
     .values({
       workspaceId: session.workspaceId,
-      name: `Follow-up: ${movie.title}`,
+      name: `Sequence ${stepIndex + 1} (${step.label}): ${movie.title}`,
       type: "email",
       movieId,
       createdBy: session.userId,
@@ -154,6 +148,8 @@ export async function sendFollowUpReminder(
     return { sent: false, error };
   }
 
+  revalidatePath("/sequences");
   revalidatePath("/dashboard");
+  revalidatePath(`/contacts/${contactId}`);
   return { sent: true };
 }

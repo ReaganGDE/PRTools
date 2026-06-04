@@ -494,6 +494,7 @@ export async function bulkPitchContacts(args: {
       const result = await client.emails.send({
         from: env.EMAIL_FROM,
         to: contact.email,
+        ...(env.EMAIL_REPLY_TO ? { replyTo: env.EMAIL_REPLY_TO } : {}),
         subject: renderedSubject,
         html,
         headers: { "X-Campaign-Id": campaign.id },

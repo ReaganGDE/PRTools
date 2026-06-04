@@ -100,6 +100,7 @@ export async function toggleScreenerSent(movieId: string, contactId: string) {
     );
   revalidatePath(`/movies/${movieId}`);
   revalidatePath(`/contacts/${contactId}`);
+  revalidatePath("/screeners");
 }
 
 export type ScreenerStatus = "not_requested" | "requested" | "approved" | "sent" | "declined";
@@ -129,4 +130,5 @@ export async function updateScreenerStatus(
     );
   revalidatePath(`/movies/${movieId}`);
   revalidatePath(`/contacts/${contactId}`);
+  revalidatePath("/screeners");
 }

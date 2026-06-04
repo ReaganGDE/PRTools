@@ -30,6 +30,10 @@ export const env = {
     return required("EMAIL_FROM");
   },
 
+  // Inbound reply address. When set, outgoing pitches use it as Reply-To so
+  // replies route to /api/webhooks/resend-inbound for automatic reply tracking.
+  EMAIL_REPLY_TO: optional("EMAIL_REPLY_TO"),
+
   ANTHROPIC_API_KEY: optional("ANTHROPIC_API_KEY"),
   NEWS_API_KEY: optional("NEWS_API_KEY"),
   YOUTUBE_API_KEY: optional("YOUTUBE_API_KEY"),

@@ -27,10 +27,10 @@ type MovieOption = { id: string; title: string | null };
 const DEFAULT_PITCH_SUBJECT = "Pitch: {{film_title}}";
 const DEFAULT_PITCH_BODY = `Hi {{first_name}},
 
-I wanted to reach out about {{film_title}}{{#if director}} directed by {{director}}{{/if}}. We'd love for you to cover it.
+I wanted to reach out about {{film_title}}. We'd love for you to cover it.
 
-{{#if screener_url}}You can watch the screener here: {{screener_url}}{{/if}}
-{{#if press_kit_url}}Press kit: {{press_kit_url}}{{/if}}
+You can watch the screener here: {{screener_url}}
+Press kit: {{press_kit_url}}
 
 Would love to chat — let me know if you have any questions!`;
 

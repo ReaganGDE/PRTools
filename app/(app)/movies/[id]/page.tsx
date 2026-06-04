@@ -44,6 +44,7 @@ import {
 import { addMovieCoverage, removeMovieCoverage } from "./coverage-actions";
 import { ScreenerStatusPicker } from "@/components/screener-status-picker";
 import type { ScreenerStatus } from "./press-actions";
+import { FilmActivityFeed, type ActivityEvent } from "@/components/film-activity-feed";
 
 export default async function MovieDetailPage({
   params,
@@ -120,6 +121,56 @@ export default async function MovieDetailPage({
       ),
     )
     .then((r) => r[0]);
+
+  // Unified outreach activity stream: pitches, opens, clicks, replies, coverage,
+  // and screener sends, newest first.
+  const activity = (await db.execute(sql`
+    SELECT kind, ts, contact_name AS "contactName",
+           contact_id AS "contactId", detail
+    FROM (
+      SELECT 'sent' AS kind, s.sent_at AS ts, c.name AS contact_name,
+             c.id AS contact_id, NULL::text AS detail
+      FROM sends s
+      JOIN campaigns ca ON ca.id = s.campaign_id
+      JOIN contacts c ON c.id = s.contact_id
+      WHERE ca.movie_id = ${id} AND ca.workspace_id = ${session.workspaceId}
+        AND s.sent_at IS NOT NULL
+      UNION ALL
+      SELECT 'opened', s.opened_at, c.name, c.id, NULL::text
+      FROM sends s
+      JOIN campaigns ca ON ca.id = s.campaign_id
+      JOIN contacts c ON c.id = s.contact_id
+      WHERE ca.movie_id = ${id} AND ca.workspace_id = ${session.workspaceId}
+        AND s.opened_at IS NOT NULL
+      UNION ALL
+      SELECT 'clicked', s.clicked_at, c.name, c.id, NULL::text
+      FROM sends s
+      JOIN campaigns ca ON ca.id = s.campaign_id
+      JOIN contacts c ON c.id = s.contact_id
+      WHERE ca.movie_id = ${id} AND ca.workspace_id = ${session.workspaceId}
+        AND s.clicked_at IS NOT NULL
+      UNION ALL
+      SELECT 'replied', s.replied_at, c.name, c.id, NULL::text
+      FROM sends s
+      JOIN campaigns ca ON ca.id = s.campaign_id
+      JOIN contacts c ON c.id = s.contact_id
+      WHERE ca.movie_id = ${id} AND ca.workspace_id = ${session.workspaceId}
+        AND s.replied_at IS NOT NULL
+      UNION ALL
+      SELECT 'coverage', cov.created_at, c2.name, cov.contact_id, cov.headline
+      FROM movie_coverages cov
+      LEFT JOIN contacts c2 ON c2.id = cov.contact_id
+      WHERE cov.movie_id = ${id} AND cov.workspace_id = ${session.workspaceId}
+      UNION ALL
+      SELECT 'screener', mc.screener_sent_at, c3.name, mc.contact_id, NULL::text
+      FROM movie_contacts mc
+      JOIN contacts c3 ON c3.id = mc.contact_id
+      WHERE mc.movie_id = ${id} AND mc.workspace_id = ${session.workspaceId}
+        AND mc.screener_sent_at IS NOT NULL
+    ) ev
+    ORDER BY ts DESC
+    LIMIT 30
+  `)) as unknown as ActivityEvent[];
 
   if (!row) notFound();
   const m = row.movie;
@@ -337,6 +388,13 @@ export default async function MovieDetailPage({
                     tone="emerald"
                   />
                 </div>
+              </Section>
+            )}
+
+            {/* Outreach activity */}
+            {activity.length > 0 && (
+              <Section title="Activity">
+                <FilmActivityFeed events={activity} />
               </Section>
             )}
 
