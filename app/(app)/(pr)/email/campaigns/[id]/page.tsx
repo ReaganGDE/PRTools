@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { sendCampaign } from "../../actions";
+import { SendsTable } from "./sends-table";
 
 export default async function CampaignDetailPage({
   params,
@@ -76,6 +77,7 @@ export default async function CampaignDetailPage({
       clickedAt: sends.clickedAt,
       repliedAt: sends.repliedAt,
       error: sends.error,
+      contactId: contacts.id,
       contactName: contacts.name,
       contactEmail: contacts.email,
     })
@@ -83,7 +85,7 @@ export default async function CampaignDetailPage({
     .innerJoin(contacts, eq(contacts.id, sends.contactId))
     .where(eq(sends.campaignId, campaign.id))
     .orderBy(desc(sends.createdAt))
-    .limit(200);
+    .limit(500);
 
   const stats = sendRows.reduce(
     (acc, s) => {
@@ -178,57 +180,22 @@ export default async function CampaignDetailPage({
         </Card>
 
         <div className="lg:col-span-3">
-          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-zinc-500">
-            Recipients
-          </h2>
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+              Send history
+            </h2>
+            {sendRows.length > 0 && (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                {sendRows.length}
+              </span>
+            )}
+          </div>
           {sendRows.length === 0 ? (
             <p className="text-sm text-zinc-500">
               Nothing sent yet. Press &quot;Send to {memberCount} contacts&quot; above when ready.
             </p>
           ) : (
-            <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-              <table className="w-full text-sm">
-                <thead className="border-b border-zinc-200 bg-zinc-50 text-left dark:border-zinc-800 dark:bg-zinc-900">
-                  <tr>
-                    <th className="px-4 py-2 font-medium">Recipient</th>
-                    <th className="px-4 py-2 font-medium">Status</th>
-                    <th className="px-4 py-2 font-medium">Opened</th>
-                    <th className="px-4 py-2 font-medium">Clicked</th>
-                    <th className="px-4 py-2 font-medium">Replied</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sendRows.map((s) => (
-                    <tr
-                      key={s.id}
-                      className="border-b border-zinc-100 last:border-0 dark:border-zinc-900"
-                    >
-                      <td className="px-4 py-2">
-                        {s.contactName}
-                        <div className="text-xs text-zinc-500">
-                          {s.contactEmail}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-xs">
-                        {s.status}
-                        {s.error ? (
-                          <div className="text-red-600">{s.error}</div>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-2 text-xs text-zinc-500">
-                        {s.openedAt ? "✓" : "—"}
-                      </td>
-                      <td className="px-4 py-2 text-xs text-zinc-500">
-                        {s.clickedAt ? "✓" : "—"}
-                      </td>
-                      <td className="px-4 py-2 text-xs text-zinc-500">
-                        {s.repliedAt ? "✓" : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <SendsTable rows={sendRows} />
           )}
         </div>
       </div>

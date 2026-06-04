@@ -5,6 +5,7 @@ import {
   contacts,
   contactLists,
   contactListMembers,
+  movies,
 } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
@@ -70,19 +71,23 @@ export default async function ContactsPage({
     .orderBy(desc(contacts.createdAt))
     .limit(PAGE_SIZE);
 
-  const lists = await db
-    .select({
-      id: contactLists.id,
-      name: contactLists.name,
-      memberCount: sql<number>`count(${contactListMembers.contactId})::int`,
-    })
-    .from(contactLists)
-    .leftJoin(
-      contactListMembers,
-      eq(contactListMembers.listId, contactLists.id),
-    )
-    .where(eq(contactLists.workspaceId, session.workspaceId))
-    .groupBy(contactLists.id);
+  const [lists, movieOptions] = await Promise.all([
+    db
+      .select({
+        id: contactLists.id,
+        name: contactLists.name,
+        memberCount: sql<number>`count(${contactListMembers.contactId})::int`,
+      })
+      .from(contactLists)
+      .leftJoin(contactListMembers, eq(contactListMembers.listId, contactLists.id))
+      .where(eq(contactLists.workspaceId, session.workspaceId))
+      .groupBy(contactLists.id),
+    db
+      .select({ id: movies.id, title: movies.title })
+      .from(movies)
+      .where(eq(movies.workspaceId, session.workspaceId))
+      .orderBy(movies.title),
+  ]);
 
   return (
     <>
@@ -202,6 +207,7 @@ export default async function ContactsPage({
               tags: c.tags,
             }))}
             lists={lists}
+            movies={movieOptions}
             totalShown={rows.length}
             pageSize={PAGE_SIZE}
           />

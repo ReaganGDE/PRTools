@@ -84,9 +84,42 @@ export async function toggleScreenerSent(movieId: string, contactId: string) {
       ),
     );
   if (!row) return;
+  const next = row.screenerSentAt ? null : new Date();
   await db
     .update(movieContacts)
-    .set({ screenerSentAt: row.screenerSentAt ? null : new Date() })
+    .set({
+      screenerSentAt: next,
+      screenerStatus: next ? "sent" : "not_requested",
+    })
+    .where(
+      and(
+        eq(movieContacts.workspaceId, session.workspaceId),
+        eq(movieContacts.movieId, movieId),
+        eq(movieContacts.contactId, contactId),
+      ),
+    );
+  revalidatePath(`/movies/${movieId}`);
+  revalidatePath(`/contacts/${contactId}`);
+}
+
+export type ScreenerStatus = "not_requested" | "requested" | "approved" | "sent" | "declined";
+
+export async function updateScreenerStatus(
+  movieId: string,
+  contactId: string,
+  status: ScreenerStatus,
+) {
+  const session = await requireSession();
+  const updates: { screenerStatus: string; screenerSentAt?: Date | null } = {
+    screenerStatus: status,
+  };
+  if (status === "sent") updates.screenerSentAt = new Date();
+  else if (status === "not_requested" || status === "declined")
+    updates.screenerSentAt = null;
+
+  await db
+    .update(movieContacts)
+    .set(updates)
     .where(
       and(
         eq(movieContacts.workspaceId, session.workspaceId),

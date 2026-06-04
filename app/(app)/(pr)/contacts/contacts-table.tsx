@@ -1,11 +1,11 @@
 "use client";
 import { useState, useTransition, useMemo } from "react";
 import Link from "next/link";
-import { ChevronDown, Plus, Check, X, Download, Tag } from "lucide-react";
+import { ChevronDown, Plus, Check, X, Download, Tag, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { addContactsToList, createList, bulkTag } from "./actions";
+import { addContactsToList, createList, bulkTag, bulkPitchContacts } from "./actions";
 
 type ContactRow = {
   id: string;
@@ -22,15 +22,28 @@ type ContactRow = {
 };
 
 type ListOption = { id: string; name: string; memberCount: number };
+type MovieOption = { id: string; title: string | null };
+
+const DEFAULT_PITCH_SUBJECT = "Pitch: {{film_title}}";
+const DEFAULT_PITCH_BODY = `Hi {{first_name}},
+
+I wanted to reach out about {{film_title}}{{#if director}} directed by {{director}}{{/if}}. We'd love for you to cover it.
+
+{{#if screener_url}}You can watch the screener here: {{screener_url}}{{/if}}
+{{#if press_kit_url}}Press kit: {{press_kit_url}}{{/if}}
+
+Would love to chat — let me know if you have any questions!`;
 
 export function ContactsTable({
   rows,
   lists,
+  movies,
   totalShown,
   pageSize,
 }: {
   rows: ContactRow[];
   lists: ListOption[];
+  movies: MovieOption[];
   totalShown: number;
   pageSize: number;
 }) {
@@ -42,6 +55,11 @@ export function ContactsTable({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [tagging, setTagging] = useState(false);
   const [tagInput, setTagInput] = useState("");
+  const [pitching, setPitching] = useState(false);
+  const [pitchMovieId, setPitchMovieId] = useState("");
+  const [pitchSubject, setPitchSubject] = useState(DEFAULT_PITCH_SUBJECT);
+  const [pitchBody, setPitchBody] = useState(DEFAULT_PITCH_BODY);
+  const [pitchResult, setPitchResult] = useState<{ sent: number; skipped: number } | null>(null);
 
   const allSelected = rows.length > 0 && selected.size === rows.length;
   const someSelected = selected.size > 0 && !allSelected;
@@ -161,6 +179,28 @@ export function ContactsTable({
     });
   }
 
+  function executeBulkPitch() {
+    if (!pitchMovieId) return;
+    const ids = Array.from(selected);
+    startTransition(async () => {
+      const res = await bulkPitchContacts({
+        contactIds: ids,
+        movieId: pitchMovieId,
+        subject: pitchSubject,
+        body: pitchBody,
+      });
+      if (!res.error) {
+        setPitchResult({ sent: res.sent, skipped: res.skipped });
+        setFeedback(`Sent pitch to ${res.sent} contact${res.sent === 1 ? "" : "s"}${res.skipped > 0 ? ` (${res.skipped} skipped — no email or suppressed)` : ""}`);
+        setPitching(false);
+        setSelected(new Set());
+        setTimeout(() => { setFeedback(null); setPitchResult(null); }, 5000);
+      } else {
+        setFeedback(`Error: ${res.error}`);
+      }
+    });
+  }
+
   return (
     <div className="space-y-3">
       {/* Bulk action bar */}
@@ -207,6 +247,16 @@ export function ContactsTable({
                 <Tag className="h-3.5 w-3.5" /> Tag
               </Button>
             )}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => { setPitching((p) => !p); setTagging(false); }}
+              disabled={movies.length === 0}
+              title={movies.length === 0 ? "No films in workspace" : undefined}
+            >
+              <Send className="h-3.5 w-3.5" /> Pitch
+            </Button>
             <Button type="button" size="sm" variant="outline" onClick={exportSelectedCsv}>
               <Download className="h-3.5 w-3.5" /> Export CSV
             </Button>
@@ -214,10 +264,70 @@ export function ContactsTable({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => setSelected(new Set())}
+              onClick={() => { setSelected(new Set()); setPitching(false); }}
             >
               Clear
             </Button>
+          </div>
+        </div>
+      )}
+
+      {pitching && (
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Pitch {selected.size} contact{selected.size === 1 ? "" : "s"}</h3>
+            <button type="button" onClick={() => setPitching(false)} className="rounded p-1 text-zinc-400 hover:text-zinc-600">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Film</label>
+              <select
+                value={pitchMovieId}
+                onChange={(e) => setPitchMovieId(e.target.value)}
+                className="h-9 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+              >
+                <option value="">Select a film…</option>
+                {movies.map((m) => (
+                  <option key={m.id} value={m.id}>{m.title ?? m.id}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">
+                Subject <span className="font-normal text-zinc-400">(merge fields: {"{{film_title}}"}, {"{{name}}"}, {"{{first_name}}"})</span>
+              </label>
+              <Input
+                value={pitchSubject}
+                onChange={(e) => setPitchSubject(e.target.value)}
+                className="text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Body</label>
+              <textarea
+                value={pitchBody}
+                onChange={(e) => setPitchBody(e.target.value)}
+                rows={7}
+                className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={executeBulkPitch}
+                disabled={isPending || !pitchMovieId || !pitchSubject.trim() || !pitchBody.trim()}
+              >
+                <Send className="h-3.5 w-3.5" />
+                {isPending ? "Sending…" : `Send to ${selected.size} contact${selected.size === 1 ? "" : "s"}`}
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setPitching(false)}>
+                Cancel
+              </Button>
+              <p className="text-xs text-zinc-400">Contacts without an email address or on the suppression list will be skipped.</p>
+            </div>
           </div>
         </div>
       )}

@@ -40,9 +40,10 @@ import {
   addMovieContact,
   addContactsFromList,
   removeMovieContact,
-  toggleScreenerSent,
 } from "./press-actions";
 import { addMovieCoverage, removeMovieCoverage } from "./coverage-actions";
+import { ScreenerStatusPicker } from "@/components/screener-status-picker";
+import type { ScreenerStatus } from "./press-actions";
 
 export default async function MovieDetailPage({
   params,
@@ -371,23 +372,11 @@ export default async function MovieDetailPage({
                           <p className="text-xs text-zinc-400">{contactEmail}</p>
                         )}
                       </div>
-                      <form action={toggleScreenerSent.bind(null, id, mc.contactId)}>
-                        <button
-                          type="submit"
-                          title={mc.screenerSentAt ? "Mark screener not sent" : "Mark screener sent"}
-                          className={cn(
-                            "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
-                            mc.screenerSentAt
-                              ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
-                              : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400",
-                          )}
-                        >
-                          <Send className="h-2.5 w-2.5" />
-                          {mc.screenerSentAt
-                            ? `Sent ${mc.screenerSentAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
-                            : "Screener?"}
-                        </button>
-                      </form>
+                      <ScreenerStatusPicker
+                        movieId={id}
+                        contactId={mc.contactId}
+                        initialStatus={(mc.screenerStatus as ScreenerStatus) ?? "not_requested"}
+                      />
                       <form action={removeMovieContact.bind(null, id, mc.contactId)}>
                         <button
                           type="submit"

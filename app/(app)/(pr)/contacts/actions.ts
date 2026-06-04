@@ -3,10 +3,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { and, eq, sql, inArray } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
-import { contacts, contactLists, contactListMembers } from "@/lib/db/schema";
+import { contacts, contactLists, contactListMembers, movies, campaigns, sends, emailSuppressions } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
 import { logAudit } from "@/lib/audit";
+import { resend } from "@/lib/email/resend";
+import { renderTemplate } from "@/lib/email/render-template";
+import { unsubscribeFooter } from "@/lib/email/footer";
+import { env } from "@/lib/env";
 
 const PLATFORMS = [
   "instagram",
@@ -410,6 +415,132 @@ export async function deleteList(listId: string) {
   await db.delete(contactLists).where(eq(contactLists.id, listId));
   revalidatePath("/contacts");
   revalidatePath("/contacts/lists");
+}
+
+export type BulkPitchResult = { sent: number; skipped: number; error?: string };
+
+export async function bulkPitchContacts(args: {
+  contactIds: string[];
+  movieId: string;
+  subject: string;
+  body: string;
+}): Promise<BulkPitchResult> {
+  const session = await requireSessionWithCap("email.campaign.send");
+  const { contactIds, movieId, subject, body } = args;
+  if (contactIds.length === 0) return { sent: 0, skipped: 0, error: "No contacts selected" };
+  if (!subject.trim() || !body.trim()) return { sent: 0, skipped: 0, error: "Subject and body required" };
+
+  const [movie] = await db
+    .select()
+    .from(movies)
+    .where(and(eq(movies.id, movieId), eq(movies.workspaceId, session.workspaceId)));
+  if (!movie) return { sent: 0, skipped: 0, error: "Film not found" };
+
+  const extras: Record<string, string> = {
+    film_title: movie.title ?? "",
+    logline: movie.logline ?? "",
+    tagline: movie.tagline ?? "",
+    director: movie.director ?? "",
+    trailer_url: movie.trailerUrl ?? "",
+    screener_url: movie.screenerUrl ?? "",
+    screener_password: movie.screenerPassword ?? "",
+    website_url: movie.websiteUrl ?? "",
+    press_kit_url: movie.pressKitUrl ?? "",
+  };
+
+  const suppressed = await db
+    .select({ email: emailSuppressions.email })
+    .from(emailSuppressions)
+    .where(eq(emailSuppressions.workspaceId, session.workspaceId));
+  const suppressedSet = new Set(suppressed.map((s) => s.email.toLowerCase()));
+
+  const contactRows = await db
+    .select()
+    .from(contacts)
+    .where(
+      and(
+        inArray(contacts.id, contactIds),
+        eq(contacts.workspaceId, session.workspaceId),
+      ),
+    );
+
+  const [campaign] = await db
+    .insert(campaigns)
+    .values({
+      workspaceId: session.workspaceId,
+      name: `Bulk pitch: ${movie.title}`,
+      type: "email",
+      movieId,
+      createdBy: session.userId,
+      status: "running",
+    })
+    .returning({ id: campaigns.id });
+
+  const client = resend();
+  let sent = 0;
+  let skipped = 0;
+
+  for (const contact of contactRows) {
+    if (!contact.email) { skipped++; continue; }
+    if (contact.unsubscribed) { skipped++; continue; }
+    if (suppressedSet.has(contact.email.toLowerCase())) { skipped++; continue; }
+
+    const renderedSubject = renderTemplate(subject, contact, extras).rendered;
+    const renderedBody = renderTemplate(body, contact, extras).rendered;
+    const footer = await unsubscribeFooter(session.workspaceId, contact.email);
+    const html = `${renderedBody.replace(/\n/g, "<br>")}\n${footer}`;
+
+    try {
+      const result = await client.emails.send({
+        from: env.EMAIL_FROM,
+        to: contact.email,
+        subject: renderedSubject,
+        html,
+        headers: { "X-Campaign-Id": campaign.id },
+        tags: [
+          { name: "campaign_id", value: campaign.id },
+          { name: "workspace_id", value: session.workspaceId },
+        ],
+      });
+      await db.insert(sends).values({
+        id: nanoid(16),
+        workspaceId: session.workspaceId,
+        campaignId: campaign.id,
+        contactId: contact.id,
+        channel: "email",
+        platform: "email",
+        status: "sent",
+        renderedSubject,
+        renderedBody: html,
+        sentAt: new Date(),
+        externalId: result.data?.id ?? null,
+        sentByUserId: session.userId,
+      });
+      sent++;
+    } catch {
+      await db.insert(sends).values({
+        id: nanoid(16),
+        workspaceId: session.workspaceId,
+        campaignId: campaign.id,
+        contactId: contact.id,
+        channel: "email",
+        status: "failed",
+        renderedSubject,
+        renderedBody: html,
+        sentByUserId: session.userId,
+      });
+      skipped++;
+    }
+  }
+
+  await db
+    .update(campaigns)
+    .set({ status: "completed", updatedAt: new Date() })
+    .where(eq(campaigns.id, campaign.id));
+
+  revalidatePath("/contacts");
+  revalidatePath("/email/campaigns");
+  return { sent, skipped };
 }
 
 export async function bulkTag(contactIds: string[], tags: string[]) {

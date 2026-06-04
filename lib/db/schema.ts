@@ -333,6 +333,7 @@ export const movieContacts = pgTable(
       .notNull()
       .references(() => contacts.id, { onDelete: "cascade" }),
     screenerSentAt: timestamp("screener_sent_at"),
+    screenerStatus: text("screener_status").notNull().default("not_requested"),
     notes: text("notes"),
     createdAt: createdAt(),
   },
