@@ -33,6 +33,7 @@ import { getActiveBrandId } from "@/lib/brand-context";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { FollowUpList } from "./follow-up-list";
 
 export default async function DashboardPage() {
   const session = await requireSession();
@@ -389,43 +390,7 @@ export default async function DashboardPage() {
               icon={<Clock className="h-4 w-4" />}
               label="Follow-ups due"
             />
-            <ul className="space-y-2">
-              {followUpsDue.map((f) => {
-                const sentAt = new Date(f.screenerSentAt);
-                const days = Math.floor(
-                  (now.getTime() - sentAt.getTime()) / (24 * 60 * 60 * 1000),
-                );
-                return (
-                  <li key={`${f.movieId}-${f.contactId}`}>
-                    <Link
-                      href={`/movies/${f.movieId}/pitch`}
-                      className="group flex items-center gap-3 rounded-xl border border-blue-200/70 bg-blue-50/50 p-3 text-sm transition-all hover:shadow-sm dark:border-blue-900/30 dark:bg-blue-950/20"
-                    >
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400">
-                        <Clock className="h-3.5 w-3.5" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                          {f.contactName}
-                        </span>
-                        {f.outlet && (
-                          <span className="ml-2 text-xs text-zinc-500">
-                            {f.outlet}
-                          </span>
-                        )}
-                        <span className="block truncate text-xs text-zinc-500">
-                          {f.title}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-xs font-medium text-blue-700 dark:text-blue-400">
-                        no reply · {days}d ago
-                      </span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-blue-400 opacity-0 transition-opacity group-hover:opacity-100" />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            <FollowUpList items={followUpsDue} />
           </div>
         )}
 

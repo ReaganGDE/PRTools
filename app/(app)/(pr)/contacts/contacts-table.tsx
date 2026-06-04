@@ -1,11 +1,11 @@
 "use client";
 import { useState, useTransition, useMemo } from "react";
 import Link from "next/link";
-import { ChevronDown, Plus, Check, X } from "lucide-react";
+import { ChevronDown, Plus, Check, X, Download, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { addContactsToList, createList } from "./actions";
+import { addContactsToList, createList, bulkTag } from "./actions";
 
 type ContactRow = {
   id: string;
@@ -40,6 +40,8 @@ export function ContactsTable({
   const [newListName, setNewListName] = useState("");
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [tagging, setTagging] = useState(false);
+  const [tagInput, setTagInput] = useState("");
 
   const allSelected = rows.length > 0 && selected.size === rows.length;
   const someSelected = selected.size > 0 && !allSelected;
@@ -93,6 +95,72 @@ export function ContactsTable({
     });
   }
 
+  function exportSelectedCsv() {
+    const chosen = rows.filter((r) => selected.has(r.id));
+    if (chosen.length === 0) return;
+    const headers = [
+      "Name",
+      "Type",
+      "Email",
+      "Outlet",
+      "Instagram",
+      "TikTok",
+      "Reddit",
+      "YouTube",
+      "Followers",
+      "Tags",
+    ];
+    const esc = (v: string | number | null) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [
+      headers.join(","),
+      ...chosen.map((c) =>
+        [
+          c.name,
+          c.type,
+          c.email,
+          c.outlet,
+          c.handleInstagram,
+          c.handleTiktok,
+          c.handleReddit,
+          c.handleYoutube,
+          c.followerCount,
+          c.tags.join("; "),
+        ]
+          .map(esc)
+          .join(","),
+      ),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `contacts-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function applyTags() {
+    const tags = tagInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (tags.length === 0) return;
+    const ids = Array.from(selected);
+    startTransition(async () => {
+      await bulkTag(ids, tags);
+      setFeedback(
+        `Tagged ${ids.length} contact${ids.length === 1 ? "" : "s"} with ${tags.map((t) => `"${t}"`).join(", ")}`,
+      );
+      setTagging(false);
+      setTagInput("");
+      setSelected(new Set());
+      setTimeout(() => setFeedback(null), 4000);
+    });
+  }
+
   return (
     <div className="space-y-3">
       {/* Bulk action bar */}
@@ -101,7 +169,7 @@ export function ContactsTable({
           <div className="text-sm font-medium text-red-900 dark:text-red-200">
             {selected.size} contact{selected.size === 1 ? "" : "s"} selected
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <ListPicker
               open={pickerOpen}
               setOpen={setPickerOpen}
@@ -114,6 +182,34 @@ export function ContactsTable({
               onCreate={addToNewList}
               isPending={isPending}
             />
+            {tagging ? (
+              <div className="flex items-center gap-1.5">
+                <Input
+                  autoFocus
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") applyTags();
+                    if (e.key === "Escape") setTagging(false);
+                  }}
+                  placeholder="tag, another tag"
+                  className="h-8 w-44"
+                />
+                <Button type="button" size="sm" onClick={applyTags} disabled={isPending || !tagInput.trim()}>
+                  Apply
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setTagging(false)}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <Button type="button" size="sm" variant="outline" onClick={() => setTagging(true)}>
+                <Tag className="h-3.5 w-3.5" /> Tag
+              </Button>
+            )}
+            <Button type="button" size="sm" variant="outline" onClick={exportSelectedCsv}>
+              <Download className="h-3.5 w-3.5" /> Export CSV
+            </Button>
             <Button
               type="button"
               variant="ghost"

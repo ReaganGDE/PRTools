@@ -44,6 +44,7 @@ const NAV_GROUPS: {
       { href: "/pr-finder", label: "Find contacts", icon: Radar },
       { href: "/outreach", label: "Outreach", icon: Send },
       { href: "/email", label: "Email", icon: Mail },
+      { href: "/pitch-report", label: "Pitch report", icon: BarChart3 },
       { href: "/inbox", label: "PR Inbox", icon: Inbox },
     ],
   },

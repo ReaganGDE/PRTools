@@ -79,6 +79,30 @@ export default async function SentimentPage({
     )
     .groupBy(mentions.source);
 
+  // 8-week sentiment trend (by ISO week, positive/neutral/negative counts).
+  const eightWeeksAgo = new Date(
+    Date.now() - 8 * 7 * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  const trend = (await db.execute(sql`
+    SELECT to_char(date_trunc('week', coalesce(published_at, created_at)), 'Mon DD') AS week,
+           count(*) FILTER (WHERE sentiment_label = 'positive')::int AS positive,
+           count(*) FILTER (WHERE sentiment_label = 'neutral')::int AS neutral,
+           count(*) FILTER (WHERE sentiment_label = 'negative')::int AS negative,
+           count(*)::int AS total
+    FROM mentions
+    WHERE workspace_id = ${session.workspaceId}
+      AND coalesce(published_at, created_at) >= ${eightWeeksAgo}
+    GROUP BY date_trunc('week', coalesce(published_at, created_at))
+    ORDER BY date_trunc('week', coalesce(published_at, created_at)) ASC
+  `)) as unknown as {
+    week: string;
+    positive: number;
+    neutral: number;
+    negative: number;
+    total: number;
+  }[];
+  const trendMax = Math.max(1, ...trend.map((t) => t.total));
+
   const recent = await db
     .select()
     .from(mentions)
@@ -138,6 +162,47 @@ export default async function SentimentPage({
           value={counts.find((c) => c.label === null)?.value ?? 0}
           color="amber"
         />
+
+        {trend.some((t) => t.total > 0) && (
+          <Card className="lg:col-span-4">
+            <CardHeader>
+              <CardTitle className="text-base">Sentiment over time</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-end gap-2 sm:gap-3">
+                {trend.map((t) => (
+                  <div key={t.week} className="flex flex-1 flex-col items-center gap-1.5">
+                    <div
+                      className="flex w-full max-w-[48px] flex-col-reverse overflow-hidden rounded-md"
+                      style={{ height: 120 }}
+                      title={`${t.week}: ${t.positive}+ / ${t.neutral}~ / ${t.negative}−`}
+                    >
+                      {/* bars stack from bottom; heights proportional to max total */}
+                      <div
+                        className="w-full bg-green-500/80"
+                        style={{ height: `${(t.positive / trendMax) * 100}%` }}
+                      />
+                      <div
+                        className="w-full bg-zinc-400/70"
+                        style={{ height: `${(t.neutral / trendMax) * 100}%` }}
+                      />
+                      <div
+                        className="w-full bg-red-500/80"
+                        style={{ height: `${(t.negative / trendMax) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-zinc-400">{t.week}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex items-center gap-4 text-xs text-zinc-500">
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-green-500" /> Positive</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-zinc-400" /> Neutral</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-red-500" /> Negative</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="lg:col-span-4">
           <CardHeader>
