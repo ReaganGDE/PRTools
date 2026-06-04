@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Envelope body -->
+  <rect x="8" y="96" width="496" height="320" rx="40" fill="#0e88b3"/>
+  <!-- White seams: open flap (V from top corners to centre) and back-panel diagonals -->
+  <g fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M28 120 L256 300 L484 120"/>
+    <path d="M28 392 L196 248"/>
+    <path d="M484 392 L316 248"/>
+  </g>
+</svg>
