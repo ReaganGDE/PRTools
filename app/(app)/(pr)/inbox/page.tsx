@@ -5,6 +5,7 @@ import { contacts, sends, campaigns } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { ReplyToggle } from "@/components/reply-toggle";
 
 const PAGE_SIZE = 50;
 
@@ -83,6 +84,7 @@ export default async function InboxPage() {
                         <time className="text-xs text-zinc-500">
                           {formatRelative(r.repliedAt)}
                         </time>
+                        <ReplyToggle sendId={r.id} initialReplied />
                         {r.contactId ? (
                           <Button asChild variant="outline" size="sm">
                             <Link href={`/contacts/${r.contactId}`}>Open</Link>

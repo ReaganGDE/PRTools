@@ -17,6 +17,7 @@ import { requireSession } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ContactForm } from "@/components/contact-form";
+import { ReplyToggle } from "@/components/reply-toggle";
 import { updateContact, deleteContact } from "../actions";
 import { ListMembership } from "./list-membership";
 import {
@@ -216,11 +217,19 @@ export default async function ContactDetailPage({
               ) : (
                 <ul className="space-y-2 text-sm">
                   {sendRows.slice(0, 10).map((s) => (
-                    <li key={s.id} className="flex justify-between">
-                      <span className="capitalize">
+                    <li key={s.id} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 flex-1 capitalize">
                         {s.channel} · {s.platform ?? "—"}
+                        <span className="ml-2 text-xs text-zinc-400 normal-case">
+                          {s.status}
+                        </span>
                       </span>
-                      <span className="text-xs text-zinc-500">{s.status}</span>
+                      {s.channel === "email" && (
+                        <ReplyToggle
+                          sendId={s.id}
+                          initialReplied={s.repliedAt != null}
+                        />
+                      )}
                     </li>
                   ))}
                 </ul>

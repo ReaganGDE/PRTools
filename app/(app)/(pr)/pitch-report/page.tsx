@@ -19,6 +19,7 @@ import {
   Send,
   ExternalLink,
 } from "lucide-react";
+import { ReplyToggle } from "@/components/reply-toggle";
 
 type SubjectRow = {
   subject: string;
@@ -241,6 +242,7 @@ export default async function PitchReportPage() {
                       <span className="shrink-0 text-xs text-zinc-400">
                         opened {new Date(r.openedAt).toLocaleDateString()}
                       </span>
+                      <ReplyToggle sendId={r.sendId} initialReplied={false} />
                       {r.movieId && (
                         <Link
                           href={`/movies/${r.movieId}/pitch`}
