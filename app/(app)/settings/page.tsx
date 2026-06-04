@@ -1,10 +1,11 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workspaces, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { PageHeader } from "@/components/page-header";
-import { can, type Role } from "@/lib/permissions";
+import { can, type Role, ROLE_RANK } from "@/lib/permissions";
 import {
   Card,
   CardContent,
@@ -13,6 +14,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { FollowUpDaysForm } from "./follow-up-days-form";
+import { ThemePicker } from "./theme-picker";
+import { RolePreviewPicker } from "./role-preview-picker";
+
 function isSet(name: string) {
   const v = process.env[name];
   return !!(v && v.length > 0);
@@ -21,12 +25,27 @@ function isSet(name: string) {
 export default async function SettingsPage() {
   const session = await auth();
   const wsId = session!.user.workspaceId!;
-  const role = session!.user.role as Role | undefined;
-  const [ws] = await db.select().from(workspaces).where(eq(workspaces.id, wsId));
-  const members = await db
-    .select({ email: users.email, name: users.name, role: users.role })
-    .from(users)
-    .where(eq(users.workspaceId, wsId));
+
+  const jar = await cookies();
+  const theme = jar.get("user-theme")?.value ?? "system";
+  const previewRoleCookie = jar.get("preview_role")?.value as Role | undefined;
+
+  const [ws, members, userRow] = await Promise.all([
+    db.select().from(workspaces).where(eq(workspaces.id, wsId)).then((r) => r[0]),
+    db.select({ email: users.email, name: users.name, role: users.role }).from(users).where(eq(users.workspaceId, wsId)),
+    session!.user.id
+      ? db.select({ role: users.role }).from(users).where(eq(users.id, session!.user.id!)).then((r) => r[0])
+      : Promise.resolve(undefined),
+  ]);
+
+  const actualRole = (userRow?.role ?? "member") as Role;
+  // Use effective role for capability checks (honour any active preview).
+  const validRoles: Role[] = ["owner", "admin", "member", "viewer"];
+  const isValidPreview =
+    !!previewRoleCookie &&
+    validRoles.includes(previewRoleCookie) &&
+    (ROLE_RANK[actualRole] ?? 0) > (ROLE_RANK[previewRoleCookie] ?? 0);
+  const role = isValidPreview ? previewRoleCookie! : actualRole;
 
   const integrations: { name: string; ok: boolean; phase: string }[] = [
     { name: "Resend (email)", ok: isSet("RESEND_API_KEY"), phase: "Phase 1" },
@@ -73,6 +92,17 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Appearance — per-user theme preference */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Appearance</CardTitle>
+            <CardDescription>Choose your preferred color scheme. Applies only to your account.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ThemePicker initialTheme={theme} />
+          </CardContent>
+        </Card>
+
         {can(role, "audit.view") ? (
           <Card>
             <CardHeader>
@@ -101,6 +131,21 @@ export default async function SettingsPage() {
             </p>
           </CardContent>
         </Card>
+
+        {/* View as role — admins+ can preview the app as a lower-tier user */}
+        {can(actualRole, "team.invite") && (
+          <Card>
+            <CardHeader>
+              <CardTitle>View as role</CardTitle>
+              <CardDescription>
+                Preview the app exactly as a lower-tier user would see it. A banner will remind you that preview mode is active.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RolePreviewPicker actualRole={actualRole} />
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="lg:col-span-2">
           <CardHeader>

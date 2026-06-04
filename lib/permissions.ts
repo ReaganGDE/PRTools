@@ -88,3 +88,10 @@ export const ROLE_DESCRIPTIONS: Record<Role, string> = {
 };
 
 export const ASSIGNABLE_ROLES: Role[] = ["admin", "member", "viewer"];
+
+export const ROLE_RANK: Record<Role, number> = {
+  owner: 4,
+  admin: 3,
+  member: 2,
+  viewer: 1,
+};

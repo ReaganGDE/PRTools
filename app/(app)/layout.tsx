@@ -1,14 +1,17 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { Sidebar } from "@/components/sidebar";
+import { RolePreviewBanner } from "@/components/role-preview-banner";
 import {
   ensureDefaultBrands,
   getActiveBrandId,
   getBrandsForWorkspace,
 } from "@/lib/brand-context";
+import { ROLE_RANK, type Role } from "@/lib/permissions";
 
 export default async function AppLayout({
   children,
@@ -35,23 +38,39 @@ export default async function AppLayout({
       : Promise.resolve(undefined),
   ]);
 
+  // Resolve the effective role (respects role-preview cookie).
+  const actualRole = (userRow?.role ?? "member") as Role;
+  const jar = await cookies();
+  const previewRoleCookie = jar.get("preview_role")?.value as Role | undefined;
+  const validRoles: Role[] = ["owner", "admin", "member", "viewer"];
+  const isValidPreview =
+    !!previewRoleCookie &&
+    validRoles.includes(previewRoleCookie) &&
+    (ROLE_RANK[actualRole] ?? 0) > (ROLE_RANK[previewRoleCookie] ?? 0);
+  const effectiveRole = isValidPreview ? previewRoleCookie! : actualRole;
+
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar
-        user={{ email: session.user.email, name: session.user.name }}
-        role={userRow?.role ?? "member"}
-        toolAccess={userRow?.toolAccess ?? "all"}
-        brands={brands.map((b) => ({
-          id: b.id,
-          name: b.name,
-          color: b.color,
-          type: b.type,
-        }))}
-        activeBrandId={activeBrandId}
-      />
-      <main className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950">
-        {children}
-      </main>
+    <div className="flex h-screen flex-col overflow-hidden">
+      {isValidPreview && (
+        <RolePreviewBanner previewRole={previewRoleCookie!} actualRole={actualRole} />
+      )}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <Sidebar
+          user={{ email: session.user.email, name: session.user.name }}
+          role={effectiveRole}
+          toolAccess={userRow?.toolAccess ?? "all"}
+          brands={brands.map((b) => ({
+            id: b.id,
+            name: b.name,
+            color: b.color,
+            type: b.type,
+          }))}
+          activeBrandId={activeBrandId}
+        />
+        <main className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

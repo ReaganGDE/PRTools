@@ -1,7 +1,136 @@
 @import "tailwindcss";
 
+/* Make `dark:` Tailwind classes respond to the .dark class on <html>
+   (instead of the OS media query). An inline script in layout.tsx adds/removes
+   .dark based on the user's cookie preference + system query for "system" mode. */
+@custom-variant dark (&:is(.dark *));
+
 /* ─── Design tokens ──────────────────────────────────────── */
 :root {
+  --background:    #f4f4f5;
+  --surface:       #ffffff;
+  --surface-raised:#ffffff;
+  --foreground:    #09090b;
+  --muted-fg:      #71717a;
+  --border:        #e4e4e7;
+  --border-subtle: #f0f0f1;
+  --accent:        #dc2626;
+  --accent-hover:  #b91c1c;
+  --accent-muted:  #fef2f2;
+  --accent-fg:     #ffffff;
+  --sidebar-bg:    #0c0c0f;
+  --sidebar-fg:    #a1a1aa;
+  --sidebar-active:#ffffff;
+  --sidebar-border:rgba(255,255,255,0.06);
+  --shadow-sm:     0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow:        0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md:     0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.08);
+  --shadow-lg:     0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --radius-sm:     0.375rem;
+  --radius:        0.5rem;
+  --radius-lg:     0.75rem;
+  --radius-xl:     1rem;
+}
+
+/* ─── Dark mode tokens ───────────────────────────────────── */
+/* Applied by .dark class (set via JS/layout) OR as media-query fallback */
+/* Applied by .dark class (set via JS/layout) OR as media-query fallback when
+   no explicit preference is stored and .light isn't set. */
+:root.dark,
+@media (prefers-color-scheme: dark) { :root:not(.light) {
+  --background:    #0a0a0d;
+  --surface:       #111115;
+  --surface-raised:#18181d;
+  --foreground:    #fafafa;
+  --muted-fg:      #71717a;
+  --border:        #27272a;
+  --border-subtle: #1f1f23;
+  --accent:        #ef4444;
+  --accent-hover:  #dc2626;
+  --accent-muted:  rgba(239,68,68,0.1);
+  --accent-fg:     #ffffff;
+  --sidebar-bg:    #0c0c0f;
+  --sidebar-border:rgba(255,255,255,0.06);
+  --shadow-sm:     0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow:        0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+  --shadow-md:     0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+} }
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent:     var(--accent);
+  --color-accent-fg:  var(--accent-fg);
+  --color-muted:      var(--surface);
+  --color-border:     var(--border);
+  --font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* ─── Base ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11", "calt";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
+  line-height: 1.5;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar              { width: 6px; height: 6px; }
+::-webkit-scrollbar-track        { background: transparent; }
+::-webkit-scrollbar-thumb        { background: #d4d4d8; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover  { background: #a1a1aa; }
+.dark ::-webkit-scrollbar-thumb       { background: #3f3f46; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) ::-webkit-scrollbar-thumb       { background: #3f3f46; }
+  :root:not(.light) ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+}
+
+/* ─── Selection ──────────────────────────────────────────── */
+::selection { background: var(--accent); color: var(--accent-fg); }
+
+/* ─── Focus rings ────────────────────────────────────────── */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:focus-visible, a:focus-visible { outline-radius: 4px; }
+
+/* ─── Native selects ─────────────────────────────────────── */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2371717a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px !important;
+}
+
+/* ─── Utility classes ────────────────────────────────────── */
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.surface-raised {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
   --background:    #f4f4f5;
   --surface:       #ffffff;
   --surface-raised:#ffffff;
