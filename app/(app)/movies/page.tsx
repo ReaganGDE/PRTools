@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { eq, desc, and, asc, sql } from "drizzle-orm";
-import { Plus, Film, Calendar, LayoutGrid, List } from "lucide-react";
+import { eq, desc, and, asc, sql, lte, isNotNull } from "drizzle-orm";
+import { Plus, Film, Calendar, LayoutGrid, List, EyeOff, Eye } from "lucide-react";
 import { db } from "@/lib/db";
 import { movies, brands, workspaces } from "@/lib/db/schema";
 import { requireSession } from "@/lib/auth-helpers";
@@ -25,7 +25,7 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
 export default async function MoviesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; status?: string }>;
+  searchParams: Promise<{ view?: string; status?: string; hideUnreleased?: string }>;
 }) {
   const session = await requireSession();
   const activeBrandId = await getActiveBrandId();
@@ -35,15 +35,27 @@ export default async function MoviesPage({
     (["in_production", "pre_release", "released", "archived"].includes(sp.status ?? "")
       ? sp.status
       : "all") as StatusFilter;
+  const hideUnreleased = sp.hideUnreleased === "1";
 
   const baseCond = activeBrandId
     ? and(eq(movies.workspaceId, session.workspaceId), eq(movies.brandId, activeBrandId))
     : eq(movies.workspaceId, session.workspaceId);
 
-  const where =
-    statusFilter === "all"
-      ? baseCond
-      : and(baseCond, eq(movies.status, statusFilter as "in_production" | "pre_release" | "released" | "archived"));
+  const conds = [baseCond];
+  if (statusFilter !== "all") {
+    conds.push(
+      eq(
+        movies.status,
+        statusFilter as "in_production" | "pre_release" | "released" | "archived",
+      ),
+    );
+  }
+  if (hideUnreleased) {
+    // "Released" = has a release date that is today or in the past.
+    conds.push(isNotNull(movies.releaseDate));
+    conds.push(lte(movies.releaseDate, new Date()));
+  }
+  const where = and(...conds);
 
   const [rows, brandList, [ws]] = await Promise.all([
     db
@@ -81,7 +93,7 @@ export default async function MoviesPage({
         description="Film projects and release campaigns."
         actions={
           <div className="flex items-center gap-2">
-            <ViewToggle current={view} />
+            <ViewToggle current={view} statusFilter={statusFilter} hideUnreleased={hideUnreleased} />
             {airtableReady && <SyncFromAirtableButton />}
             <Button asChild>
               <Link href="/movies/new">
@@ -92,12 +104,13 @@ export default async function MoviesPage({
         }
       />
       <div className="p-8">
-        {/* Status filter pills */}
-        <div className="mb-5 flex flex-wrap gap-2">
+        {/* Filters */}
+        <div className="mb-5 flex flex-wrap items-center gap-2">
           {(Object.keys(STATUS_LABELS) as StatusFilter[]).map((s) => {
             const params = new URLSearchParams();
             if (view !== "grid") params.set("view", view);
             if (s !== "all") params.set("status", s);
+            if (hideUnreleased) params.set("hideUnreleased", "1");
             const href = `/movies${params.toString() ? `?${params}` : ""}`;
             return (
               <Link
@@ -120,6 +133,13 @@ export default async function MoviesPage({
               </Link>
             );
           })}
+
+          {/* Hide unreleased toggle */}
+          <HideUnreleasedToggle
+            view={view}
+            statusFilter={statusFilter}
+            active={hideUnreleased}
+          />
         </div>
         {rows.length === 0 ? (
           <EmptyState hasBrands={brandList.length > 0} />
@@ -142,13 +162,69 @@ export default async function MoviesPage({
   );
 }
 
-function ViewToggle({ current }: { current: View }) {
+function HideUnreleasedToggle({
+  view,
+  statusFilter,
+  active,
+}: {
+  view: View;
+  statusFilter: StatusFilter;
+  active: boolean;
+}) {
+  const params = new URLSearchParams();
+  if (view !== "grid") params.set("view", view);
+  if (statusFilter !== "all") params.set("status", statusFilter);
+  // Toggling: keep current filters, flip the flag.
+  if (!active) params.set("hideUnreleased", "1");
+  const href = `/movies${params.toString() ? `?${params}` : ""}`;
+
+  return (
+    <Link
+      href={href}
+      title={
+        active
+          ? "Showing only released movies — click to show all"
+          : "Hide movies that aren't released yet"
+      }
+      className={cn(
+        "ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+        active
+          ? "border-red-500 bg-red-500 text-white"
+          : "border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900",
+      )}
+    >
+      {active ? (
+        <EyeOff className="h-3.5 w-3.5" />
+      ) : (
+        <Eye className="h-3.5 w-3.5" />
+      )}
+      Hide unreleased
+    </Link>
+  );
+}
+
+function ViewToggle({
+  current,
+  statusFilter,
+  hideUnreleased,
+}: {
+  current: View;
+  statusFilter: StatusFilter;
+  hideUnreleased: boolean;
+}) {
   const base =
     "flex h-9 items-center gap-1.5 border border-zinc-200 px-3 text-sm font-medium transition-colors dark:border-zinc-800";
+  function hrefFor(v: View) {
+    const params = new URLSearchParams();
+    if (v !== "grid") params.set("view", v);
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (hideUnreleased) params.set("hideUnreleased", "1");
+    return `/movies${params.toString() ? `?${params}` : ""}`;
+  }
   return (
     <div className="flex overflow-hidden rounded-lg">
       <Link
-        href="/movies?view=grid"
+        href={hrefFor("grid")}
         className={cn(
           base,
           "rounded-l-lg border-r-0",
@@ -160,7 +236,7 @@ function ViewToggle({ current }: { current: View }) {
         <LayoutGrid className="h-3.5 w-3.5" /> Grid
       </Link>
       <Link
-        href="/movies?view=list"
+        href={hrefFor("list")}
         className={cn(
           base,
           "rounded-r-lg",
