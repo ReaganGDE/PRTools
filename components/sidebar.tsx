@@ -13,7 +13,6 @@ import {
   Home,
   LogOut,
   Film,
-  ChevronRight,
   MessageCircle,
   Sparkles,
   Radar,
@@ -113,19 +112,14 @@ export function Sidebar({
       style={{ background: "var(--sidebar-bg)", borderRight: "1px solid var(--sidebar-border)" }}
     >
       {/* Logo */}
-      <div className="px-4 pt-5 pb-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-sm font-bold text-white shadow-lg shadow-red-900/40">
+      <div className="px-4 pt-5 pb-2">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-600 text-[13px] font-black text-white shadow-md shadow-red-900/50">
             P
           </div>
-          <div>
-            <div className="text-[13px] font-semibold text-white tracking-tight">
-              PRTools
-            </div>
-            <div className="text-[10px] text-zinc-600 tracking-wide uppercase">
-              Good Deed
-            </div>
-          </div>
+          <span className="text-[14px] font-semibold tracking-tight text-white">
+            PRTools
+          </span>
         </div>
       </div>
 
@@ -133,11 +127,11 @@ export function Sidebar({
       <BrandSwitcher brands={brands} activeBrandId={activeBrandId} />
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-5">
+      <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-4">
         {visibleGroups.map((group, gi) => (
           <div key={gi}>
             {group.label ? (
-              <div className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
+              <div className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
                 {group.label}
               </div>
             ) : null}
@@ -151,25 +145,22 @@ export function Sidebar({
                     key={href}
                     href={href}
                     className={cn(
-                      "group relative flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] font-medium transition-all duration-100",
+                      "group relative flex items-center gap-2.5 rounded-md px-2.5 py-[6px] text-[13px] font-medium transition-colors duration-100",
                       active
                         ? "bg-white/10 text-white"
                         : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200",
                     )}
                   >
                     {active && (
-                      <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-red-500" />
+                      <span className="absolute left-0 top-1/2 h-[18px] w-0.5 -translate-y-1/2 rounded-r-full bg-red-500" />
                     )}
                     <Icon
                       className={cn(
                         "h-[15px] w-[15px] shrink-0 transition-colors",
-                        active ? "text-red-400" : "text-zinc-500 group-hover:text-zinc-400",
+                        active ? "text-red-400" : "text-zinc-500 group-hover:text-zinc-300",
                       )}
                     />
-                    <span className="flex-1">{label}</span>
-                    {active && (
-                      <ChevronRight className="h-3 w-3 text-zinc-600" />
-                    )}
+                    <span className="truncate">{label}</span>
                   </Link>
                 );
               })}
@@ -183,15 +174,15 @@ export function Sidebar({
         className="border-t px-3 py-3"
         style={{ borderColor: "var(--sidebar-border)" }}
       >
-        <div className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-700 text-[11px] font-bold text-white shadow shadow-red-900/30">
+        <div className="flex items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-white/5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-700 text-[11px] font-bold text-white shadow shadow-red-900/40">
             {initials || "U"}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-medium text-zinc-300">
+            <div className="truncate text-[12px] font-medium leading-tight text-zinc-200">
               {user.name ?? user.email?.split("@")[0] ?? "Account"}
             </div>
-            <div className="truncate text-[10px] text-zinc-600">
+            <div className="truncate text-[10px] text-zinc-500 leading-tight">
               {user.email}
             </div>
           </div>
@@ -199,7 +190,7 @@ export function Sidebar({
             <button
               type="submit"
               title="Sign out"
-              className="rounded-md p-1 text-zinc-600 transition-colors hover:bg-white/5 hover:text-zinc-400"
+              className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-white/10 hover:text-zinc-300"
             >
               <LogOut className="h-3.5 w-3.5" />
             </button>

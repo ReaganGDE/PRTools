@@ -8,7 +8,7 @@ export const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border border-zinc-200/80 bg-white text-zinc-950 shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900 dark:text-zinc-50",
+      "rounded-xl border border-zinc-200 bg-white text-zinc-950 shadow-[0_1px_4px_rgb(0_0_0/0.06),_0_1px_2px_-1px_rgb(0_0_0/0.04)] dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 dark:shadow-[0_1px_4px_rgb(0_0_0/0.3)]",
       className,
     )}
     {...props}
@@ -20,7 +20,7 @@ export const CardHeader = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("flex flex-col gap-1.5 p-6", className)} {...props} />
+  <div ref={ref} className={cn("flex flex-col gap-1 p-6", className)} {...props} />
 ));
 CardHeader.displayName = "CardHeader";
 
@@ -30,7 +30,7 @@ export const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("text-lg font-semibold leading-none tracking-tight", className)}
+    className={cn("text-[15px] font-semibold leading-none tracking-tight", className)}
     {...props}
   />
 ));

@@ -7,7 +7,7 @@
 
 /* ─── Design tokens ──────────────────────────────────────── */
 :root {
-  --background:    #f4f4f5;
+  --background:    #ecedef;
   --surface:       #ffffff;
   --surface-raised:#ffffff;
   --foreground:    #09090b;
@@ -33,7 +33,6 @@
 }
 
 /* ─── Dark mode tokens ───────────────────────────────────── */
-/* Explicit dark preference: .dark class set by the inline theme script. */
 :root.dark {
   --background:    #0a0a0d;
   --surface:       #111115;
@@ -53,8 +52,7 @@
   --shadow-md:     0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
 }
 
-/* No-JS fallback: follow the OS preference unless an explicit light choice
-   (.light) is recorded. */
+/* No-JS fallback */
 @media (prefers-color-scheme: dark) {
   :root:not(.light):not(.dark) {
     --background:    #0a0a0d;
@@ -127,15 +125,32 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ─── Focus rings ────────────────────────────────────────── */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-button:focus-visible, a:focus-visible { outline-radius: 4px; }
 
 /* ─── Native selects ─────────────────────────────────────── */
 select {
   appearance: none;
+  color: inherit;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2371717a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   padding-right: 28px !important;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+select:focus-visible {
+  outline: none;
+  border-color: #f87171;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+/* ─── Interactive list/table rows ────────────────────────── */
+.row-hover {
+  transition: background-color 0.1s;
+}
+.row-hover:hover {
+  background-color: rgb(244 244 245 / 0.8);
+}
+.dark .row-hover:hover {
+  background-color: rgb(39 39 42 / 0.5);
 }
 
 /* ─── Utility classes ────────────────────────────────────── */
@@ -149,4 +164,9 @@ select {
   background: var(--surface-raised);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
+}
+
+/* ─── Dividers in lists/tables ───────────────────────────── */
+.divide-subtle > * + * {
+  border-top: 1px solid var(--border-subtle);
 }
