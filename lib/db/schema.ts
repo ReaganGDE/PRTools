@@ -691,6 +691,58 @@ export const movieCoverages = pgTable(
   (t) => [index("movie_coverages_movie_idx").on(t.movieId)],
 );
 
+/* ────────────────────── Resources ────────────────────── */
+
+export const resourceTypeEnum = pgEnum("resource_type", ["link", "credential", "document"]);
+
+export const resourceGroups = pgTable("resource_groups", {
+  id: id(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color").default("#6366f1").notNull(),
+  createdAt: createdAt(),
+}, (t) => [index("resource_groups_workspace_idx").on(t.workspaceId)]);
+
+export const resourceGroupMembers = pgTable("resource_group_members", {
+  groupId: text("group_id").notNull().references(() => resourceGroups.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  addedAt: timestamp("added_at").defaultNow().notNull(),
+}, (t) => [primaryKey({ columns: [t.groupId, t.userId] })]);
+
+export const resources = pgTable("resources", {
+  id: id(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  type: resourceTypeEnum("type").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  url: text("url"),
+  username: text("username"),
+  password: text("password"),
+  fileUrl: text("file_url"),
+  fileName: text("file_name"),
+  fileSize: integer("file_size"),
+  fileMimeType: text("file_mime_type"),
+  externalUrl: text("external_url"),
+  isPersonal: boolean("is_personal").default(false).notNull(),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  index("resources_workspace_idx").on(t.workspaceId),
+  index("resources_created_by_idx").on(t.createdBy),
+]);
+
+export const resourceGroupAssignments = pgTable("resource_group_assignments", {
+  resourceId: text("resource_id").notNull().references(() => resources.id, { onDelete: "cascade" }),
+  groupId: text("group_id").notNull().references(() => resourceGroups.id, { onDelete: "cascade" }),
+}, (t) => [primaryKey({ columns: [t.resourceId, t.groupId] })]);
+
+export const resourceUserAssignments = pgTable("resource_user_assignments", {
+  resourceId: text("resource_id").notNull().references(() => resources.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+}, (t) => [primaryKey({ columns: [t.resourceId, t.userId] })]);
+
 /* ─────────────────────── Relations ─────────────────────── */
 
 export const workspacesRelations = relations(workspaces, ({ many }) => ({
@@ -786,3 +838,5 @@ export type Send = typeof sends.$inferSelect;
 export type Mention = typeof mentions.$inferSelect;
 export type SocialPost = typeof socialPosts.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type ResourceGroup = typeof resourceGroups.$inferSelect;
+export type Resource = typeof resources.$inferSelect;

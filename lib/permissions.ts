@@ -53,6 +53,10 @@ export const CAPABILITIES = {
   "team.remove": ["owner", "admin"], // admin cannot remove owner
   "workspace.edit": ["owner"],
   "workspace.delete": ["owner"],
+
+  // Resources
+  "resources.view": ["owner", "admin", "member", "viewer"],
+  "resources.admin": ["owner", "admin"],
 } as const satisfies Record<string, Role[]>;
 
 export type Capability = keyof typeof CAPABILITIES;
