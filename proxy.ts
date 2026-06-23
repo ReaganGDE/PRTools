@@ -15,8 +15,15 @@ const PUBLIC_PATHS = [
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
+  // Expose the pathname to server components (the app layout reads this to
+  // enforce onboarding access restrictions at a single choke point).
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-pathname", pathname);
+  const pass = () =>
+    NextResponse.next({ request: { headers: requestHeaders } });
+
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
+    return pass();
   }
 
   if (!req.auth) {
@@ -25,7 +32,7 @@ export default auth((req) => {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  return pass();
 });
 
 export const config = {
