@@ -115,13 +115,13 @@ export type SyncResult = {
 async function dedupeMovies(workspaceId: string): Promise<number> {
   // Get all movies for the workspace, grouped conceptually by lower(title).
   const dupes = (await db.execute(sql`
-    SELECT id, lower(title) AS key,
+    SELECT id, lower(title) || '|' || coalesce(brand_id, '') AS key,
            airtable_record_id,
            airtable_synced_at,
            created_at
     FROM movies
     WHERE workspace_id = ${workspaceId}
-    ORDER BY lower(title),
+    ORDER BY lower(title) || '|' || coalesce(brand_id, ''),
              (airtable_record_id IS NOT NULL) DESC,
              airtable_synced_at DESC NULLS LAST,
              created_at ASC
@@ -133,7 +133,7 @@ async function dedupeMovies(workspaceId: string): Promise<number> {
     created_at: Date;
   }[];
 
-  // Group by key; first entry in each group is the one we keep.
+  // Group by (title + brand); first entry in each group is the one we keep.
   const groups = new Map<string, string[]>();
   for (const row of dupes) {
     const list = groups.get(row.key) ?? [];
@@ -304,10 +304,14 @@ export async function syncMoviesFromAirtable(): Promise<{
           continue;
         }
 
-        // Route to brand by matching Studio name; fall back to first brand
-        // mapped to this table if no match.
+        // Route to brand by matching Studio name, but only among brands mapped
+        // to this table. Fall back to first mapped brand when no match.
         const studio = readString(f, "Studio");
-        const studioBrand = studio ? brandByName.get(norm(studio)) : undefined;
+        const studioBrandGlobal = studio ? brandByName.get(norm(studio)) : undefined;
+        const studioBrand =
+          studioBrandGlobal && brandsForTable.some((b) => b.id === studioBrandGlobal.id)
+            ? studioBrandGlobal
+            : undefined;
         const brandForRecord = studioBrand ?? brandsForTable[0];
 
         const theatricalDate =
