@@ -137,6 +137,7 @@ export const users = pgTable("users", {
   }),
   role: userRoleEnum("role").default("member").notNull(),
   toolAccess: toolAccessEnum("tool_access").default("all").notNull(),
+  isOnboarding: boolean("is_onboarding").default(false).notNull(),
   createdAt: createdAt(),
 });
 
@@ -743,6 +744,75 @@ export const resourceUserAssignments = pgTable("resource_user_assignments", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
 }, (t) => [primaryKey({ columns: [t.resourceId, t.userId] })]);
 
+/* ────────────────────── Onboarding ────────────────────── */
+
+export const onboardingPaperworkStatusEnum = pgEnum("onboarding_paperwork_status", [
+  "pending",
+  "submitted",
+  "approved",
+]);
+
+export const onboardingLearningTypeEnum = pgEnum("onboarding_learning_type", [
+  "link",
+  "text",
+]);
+
+// A required paperwork item assigned to a specific onboardee. Admin can attach
+// a blank template (link or uploaded file); the onboardee uploads the completed
+// document back, which moves it to "submitted".
+export const onboardingPaperwork = pgTable("onboarding_paperwork", {
+  id: id(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  templateUrl: text("template_url"),
+  templateFileUrl: text("template_file_url"),
+  templateFileName: text("template_file_name"),
+  submittedFileUrl: text("submitted_file_url"),
+  submittedFileName: text("submitted_file_name"),
+  status: onboardingPaperworkStatusEnum("status").default("pending").notNull(),
+  submittedAt: timestamp("submitted_at"),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  index("onboarding_paperwork_workspace_idx").on(t.workspaceId),
+  index("onboarding_paperwork_user_idx").on(t.userId),
+]);
+
+// A learning resource shown to all onboardees in the workspace. Either a link
+// out, or inline rich text the admin writes directly.
+export const onboardingLearnings = pgTable("onboarding_learnings", {
+  id: id(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: onboardingLearningTypeEnum("type").default("link").notNull(),
+  url: text("url"),
+  body: text("body"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [index("onboarding_learnings_workspace_idx").on(t.workspaceId)]);
+
+// A question submitted by an onboardee from anywhere in the portal. Emailed to
+// the workspace owner/admins; emailedAt records the delivery attempt.
+export const onboardingQuestions = pgTable("onboarding_questions", {
+  id: id(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  question: text("question").notNull(),
+  pageContext: text("page_context"),
+  answeredAt: timestamp("answered_at"),
+  emailedAt: timestamp("emailed_at"),
+  createdAt: createdAt(),
+}, (t) => [
+  index("onboarding_questions_workspace_idx").on(t.workspaceId),
+  index("onboarding_questions_user_idx").on(t.userId),
+]);
+
 /* ─────────────────────── Relations ─────────────────────── */
 
 export const workspacesRelations = relations(workspaces, ({ many }) => ({
@@ -840,3 +910,6 @@ export type SocialPost = typeof socialPosts.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type ResourceGroup = typeof resourceGroups.$inferSelect;
 export type Resource = typeof resources.$inferSelect;
+export type OnboardingPaperwork = typeof onboardingPaperwork.$inferSelect;
+export type OnboardingLearning = typeof onboardingLearnings.$inferSelect;
+export type OnboardingQuestion = typeof onboardingQuestions.$inferSelect;

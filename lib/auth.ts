@@ -57,6 +57,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         .select({
           workspaceId: users.workspaceId,
           role: users.role,
+          isOnboarding: users.isOnboarding,
         })
         .from(users)
         .where(eq(users.id, user.id))
@@ -64,6 +65,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = user.id;
       session.user.workspaceId = row?.workspaceId ?? null;
       session.user.role = row?.role ?? "member";
+      session.user.isOnboarding = row?.isOnboarding ?? false;
       return session;
     },
   },

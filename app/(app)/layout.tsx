@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -31,12 +31,29 @@ export default async function AppLayout({
     getActiveBrandId(),
     session.user.id
       ? db
-          .select({ role: users.role, toolAccess: users.toolAccess })
+          .select({
+            role: users.role,
+            toolAccess: users.toolAccess,
+            isOnboarding: users.isOnboarding,
+          })
           .from(users)
           .where(eq(users.id, session.user.id))
           .then((r) => r[0])
       : Promise.resolve(undefined),
   ]);
+
+  // Onboardees get a restricted experience: only the onboarding portal and
+  // resources. Enforce it here (a single choke point for all /(app) routes)
+  // using the pathname exposed by middleware.
+  const isOnboarding = userRow?.isOnboarding ?? false;
+  if (isOnboarding) {
+    const pathname = (await headers()).get("x-pathname") ?? "";
+    const allowed = ["/portal", "/resources"];
+    const isAllowed = allowed.some(
+      (p) => pathname === p || pathname.startsWith(`${p}/`),
+    );
+    if (!isAllowed) redirect("/portal");
+  }
 
   // Resolve the effective role (respects role-preview cookie).
   const actualRole = (userRow?.role ?? "member") as Role;
@@ -59,6 +76,7 @@ export default async function AppLayout({
           user={{ email: session.user.email, name: session.user.name }}
           role={effectiveRole}
           toolAccess={userRow?.toolAccess ?? "all"}
+          isOnboarding={isOnboarding}
           brands={brands.map((b) => ({
             id: b.id,
             name: b.name,

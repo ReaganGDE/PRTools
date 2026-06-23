@@ -92,6 +92,22 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
 
+        {can(role, "onboarding.admin") ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Onboarding</CardTitle>
+              <CardDescription>
+                <Link href="/settings/onboarding" className="hover:underline">
+                  Manage onboarding →
+                </Link>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-zinc-500">
+              Set up new-hire paperwork, learning materials, and see their questions.
+            </CardContent>
+          </Card>
+        ) : null}
+
         {/* Appearance — per-user theme preference */}
         <Card>
           <CardHeader>

@@ -57,6 +57,10 @@ export const CAPABILITIES = {
   // Resources
   "resources.view": ["owner", "admin", "member", "viewer"],
   "resources.admin": ["owner", "admin"],
+
+  // Onboarding
+  "onboarding.view": ["owner", "admin", "member", "viewer"],
+  "onboarding.admin": ["owner", "admin"],
 } as const satisfies Record<string, Role[]>;
 
 export type Capability = keyof typeof CAPABILITIES;

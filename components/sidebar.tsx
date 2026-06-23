@@ -19,6 +19,7 @@ import {
   Clapperboard,
   Workflow,
   BookOpen,
+  GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandSwitcher, type BrandOption } from "@/components/brand-switcher";
@@ -70,6 +71,18 @@ const NAV_GROUPS: {
   },
 ];
 
+// Restricted nav shown to onboardees — only the portal and shared resources.
+const ONBOARDING_NAV_GROUPS: typeof NAV_GROUPS = [
+  {
+    label: null,
+    section: null,
+    items: [
+      { href: "/portal", label: "Onboarding", icon: GraduationCap },
+      { href: "/resources", label: "Resources", icon: BookOpen },
+    ],
+  },
+];
+
 type ToolAccess = "all" | "pr_only" | "social_only";
 
 function sectionVisible(section: ToolSection, toolAccess: ToolAccess): boolean {
@@ -84,12 +97,14 @@ export function Sidebar({
   user,
   role: _role,
   toolAccess,
+  isOnboarding = false,
   brands,
   activeBrandId,
 }: {
   user: { email?: string | null; name?: string | null };
   role: string;
   toolAccess: ToolAccess;
+  isOnboarding?: boolean;
   brands: BrandOption[];
   activeBrandId: string | null;
 }) {
@@ -104,9 +119,9 @@ export function Sidebar({
     .map((s) => s[0]?.toUpperCase())
     .join("");
 
-  const visibleGroups = NAV_GROUPS.filter((g) =>
-    sectionVisible(g.section, toolAccess),
-  );
+  const visibleGroups = isOnboarding
+    ? ONBOARDING_NAV_GROUPS
+    : NAV_GROUPS.filter((g) => sectionVisible(g.section, toolAccess));
 
   return (
     <aside
@@ -126,7 +141,9 @@ export function Sidebar({
       </div>
 
       {/* Brand switcher */}
-      <BrandSwitcher brands={brands} activeBrandId={activeBrandId} />
+      {!isOnboarding && (
+        <BrandSwitcher brands={brands} activeBrandId={activeBrandId} />
+      )}
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-4">
