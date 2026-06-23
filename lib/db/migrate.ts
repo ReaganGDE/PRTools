@@ -8,7 +8,12 @@ import postgres from "postgres";
 
 async function main() {
   const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL not set");
+  if (!url) {
+    // No DB configured (e.g. a local build or a preview without a database).
+    // Skip rather than fail the build — runtime will surface any real issue.
+    console.log("• DATABASE_URL not set — skipping migrations");
+    return;
+  }
   const client = postgres(url, { max: 1, prepare: false });
   await migrate(drizzle(client), { migrationsFolder: "./drizzle" });
   await client.end();

@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1778777745475,
-      "tag": "0000_new_vampiro",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1778781181766,
-      "tag": "0001_curious_justin_hammer",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1778854214694,
-      "tag": "0002_friendly_dazzler",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1778872295715,
-      "tag": "0003_mature_pride",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1779378897156,
-      "tag": "0004_brands_movies",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1779806364156,
-      "tag": "0005_airtable_integration",
+      "when": 1782240425058,
+      "tag": "0000_baseline",
       "breakpoints": true
     }
   ]
