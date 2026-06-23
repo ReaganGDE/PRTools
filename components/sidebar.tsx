@@ -18,6 +18,7 @@ import {
   Radar,
   Clapperboard,
   Workflow,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandSwitcher, type BrandOption } from "@/components/brand-switcher";
@@ -35,6 +36,7 @@ const NAV_GROUPS: {
     items: [
       { href: "/dashboard", label: "Dashboard", icon: Home },
       { href: "/movies", label: "Movies", icon: Film },
+      { href: "/resources", label: "Resources", icon: BookOpen },
     ],
   },
   {
