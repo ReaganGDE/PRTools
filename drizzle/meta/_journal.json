@@ -43,13 +43,6 @@
       "when": 1779806364156,
       "tag": "0005_airtable_integration",
       "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1750694400000,
-      "tag": "0019_resources",
-      "breakpoints": true
     }
   ]
 }
