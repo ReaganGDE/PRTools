@@ -1,5 +1,4 @@
-import { auth } from "@/lib/auth";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -12,7 +11,18 @@ const PUBLIC_PATHS = [
   "/favicon",
 ];
 
-export default auth((req) => {
+// Auth.js v5 names the database-session cookie "authjs.session-token"
+// ("__Secure-" prefixed over https). We only check for its presence here as a
+// cheap early redirect — the authoritative session validation runs in the
+// Node-runtime app layout via auth(). This keeps the Postgres-backed adapter
+// out of the Edge middleware runtime, where it cannot run (doing so throws an
+// Auth.js "Configuration" error on every request).
+const SESSION_COOKIES = [
+  "authjs.session-token",
+  "__Secure-authjs.session-token",
+];
+
+export default function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Expose the pathname to server components (the app layout reads this to
@@ -26,14 +36,15 @@ export default auth((req) => {
     return pass();
   }
 
-  if (!req.auth) {
+  const hasSession = SESSION_COOKIES.some((name) => req.cookies.has(name));
+  if (!hasSession) {
     const url = new URL("/login", req.url);
     url.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(url);
   }
 
   return pass();
-});
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.svg).*)"],
