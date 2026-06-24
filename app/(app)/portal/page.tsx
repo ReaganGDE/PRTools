@@ -26,7 +26,7 @@ import { PageHeader } from "@/components/page-header";
 import { submitPaperwork, setBringsOnDay1 } from "./actions";
 import { QuestionBox } from "./question-box";
 
-type PaperworkRow = typeof onboardingPaperwork.$inferSelect & {
+type PaperworkRow = Omit<typeof onboardingPaperwork.$inferSelect, "submittedFileData" | "submittedFileContentType"> & {
   allowBringOnDay1: boolean | null;
 };
 type Learning = typeof onboardingLearnings.$inferSelect;

@@ -772,6 +772,8 @@ export const onboardingPaperwork = pgTable("onboarding_paperwork", {
   templateFileName: text("template_file_name"),
   submittedFileUrl: text("submitted_file_url"),
   submittedFileName: text("submitted_file_name"),
+  submittedFileData: text("submitted_file_data"),
+  submittedFileContentType: text("submitted_file_content_type"),
   bringsOnDay1: boolean("brings_on_day1").default(false).notNull(),
   status: onboardingPaperworkStatusEnum("status").default("pending").notNull(),
   submittedAt: timestamp("submitted_at"),

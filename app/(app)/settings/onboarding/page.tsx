@@ -484,23 +484,14 @@ export default async function OnboardingAdminPage({
                                     {p.templateFileName ?? "Template file"}
                                   </a>
                                 )}
-                                {p.submittedFileUrl ? (
+                                {p.status !== "pending" && (
                                   <a
-                                    href={p.submittedFileUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                    href={`/api/paperwork/${p.id}/download`}
                                     className="inline-flex items-center gap-1 text-emerald-600 hover:underline dark:text-emerald-400"
                                   >
                                     <FileText className="h-3.5 w-3.5" />
-                                    {p.submittedFileName ?? "Submitted file"}
+                                    {p.submittedFileName ?? "Download file"}
                                   </a>
-                                ) : (
-                                  p.status !== "pending" && (
-                                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                                      <FileText className="h-3.5 w-3.5" />
-                                      {p.submittedFileName ?? "Saved to SharePoint"}
-                                    </span>
-                                  )
                                 )}
                               </div>
                               <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-4 dark:border-zinc-800/60">

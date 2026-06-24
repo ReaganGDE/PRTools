@@ -48,13 +48,6 @@ export const env = {
   INNGEST_EVENT_KEY: optional("INNGEST_EVENT_KEY"),
   INNGEST_SIGNING_KEY: optional("INNGEST_SIGNING_KEY"),
   ONEUP_API_KEY: optional("ONEUP_API_KEY"),
-  BLOB_READ_WRITE_TOKEN: optional("BLOB_READ_WRITE_TOKEN"),
-
-  // Power Automate (or Make.com) HTTP webhook that receives a completed
-  // onboarding document and saves it into a SharePoint folder. When set,
-  // paperwork uploads go here; if unset or the call fails, we fall back to
-  // Vercel Blob. See SETUP.md → "SharePoint paperwork uploads".
-  SHAREPOINT_UPLOAD_WEBHOOK_URL: optional("SHAREPOINT_UPLOAD_WEBHOOK_URL"),
   // Influencer discovery for Instagram/TikTok (paid: Modash / HypeAuditor).
   // When unset, the influencer finder only searches YouTube.
   MODASH_API_KEY: optional("MODASH_API_KEY"),
