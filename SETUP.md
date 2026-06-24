@@ -89,6 +89,53 @@ Uses Reddit credentials from Phase 5. Note: Reddit closed self-service API acces
 
 You'll need to submit your app for **Meta App Review** to use these features in production. Allow 2–6 weeks. In the meantime, you can use a Business IG account that's added as a tester on the app.
 
+## SharePoint paperwork uploads (optional)
+
+By default, completed onboarding paperwork is stored in **Vercel Blob**. To save
+it into a **SharePoint folder** instead, set `SHAREPOINT_UPLOAD_WEBHOOK_URL` to a
+Power Automate (or Make.com) webhook. When set, uploads go to SharePoint; if it's
+unset or a save fails, the app falls back to Vercel Blob automatically.
+
+### Power Automate flow (no Azure app registration needed)
+
+1. Go to https://make.powerautomate.com → **Create** → **Instant cloud flow**.
+2. Trigger: **When an HTTP request is received**.
+3. Set the **Request Body JSON Schema** to:
+   ```json
+   {
+     "type": "object",
+     "properties": {
+       "fileName": { "type": "string" },
+       "folder": { "type": "string" },
+       "contentType": { "type": "string" },
+       "contentBase64": { "type": "string" },
+       "employeeName": { "type": "string" },
+       "employeeEmail": { "type": "string" },
+       "documentTitle": { "type": "string" },
+       "originalFileName": { "type": "string" }
+     }
+   }
+   ```
+4. Add a **SharePoint → Create file** action:
+   - **Site Address**: your site (e.g. `https://gooddeed.sharepoint.com/sites/HR`)
+   - **Folder Path**: `Onboarding/@{triggerBody()?['folder']}`
+   - **File Name**: `@{triggerBody()?['fileName']}`
+   - **File Content**: expression `base64ToBinary(triggerBody()?['contentBase64'])`
+5. Add a **Response** action (returns the link to the app so it's clickable in
+   the portal):
+   - **Status Code**: `200`
+   - **Body**: `{ "url": "@{body('Create_file')?['{Link}']}", "name": "@{triggerBody()?['fileName']}" }`
+6. **Save** the flow, then copy the **HTTP POST URL** from the trigger.
+7. Add it to your env as `SHAREPOINT_UPLOAD_WEBHOOK_URL` (locally in
+   `.env.local` and in Vercel project settings), and redeploy.
+
+The Response step is optional — without it, files still land in SharePoint, the
+portal just won't show a clickable link back (it shows "Saved" instead).
+
+> Make.com works the same way: a **Custom webhook** trigger → **SharePoint /
+> OneDrive: Upload a file** module (decode `contentBase64`) → **Webhook
+> response** returning `{ "url": ..., "name": ... }`.
+
 ## 4. Deploying to Vercel
 
 ```bash

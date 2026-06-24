@@ -260,18 +260,25 @@ function PaperworkCard({ item }: { item: PaperworkRow }) {
             </a>
           )}
 
-          {item.submittedFileUrl && (
+          {item.status !== "pending" && (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-zinc-500">Submitted:</span>
-              <a
-                href={item.submittedFileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 font-medium text-blue-600 hover:underline dark:text-blue-400"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                {item.submittedFileName || "View file"}
-              </a>
+              {item.submittedFileUrl ? (
+                <a
+                  href={item.submittedFileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 font-medium text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  {item.submittedFileName || "View file"}
+                </a>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 font-medium text-zinc-600 dark:text-zinc-300">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {item.submittedFileName || "Saved"}
+                </span>
+              )}
               {item.status === "approved" && (
                 <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                   <CheckCircle2 className="h-3.5 w-3.5" />
@@ -283,7 +290,7 @@ function PaperworkCard({ item }: { item: PaperworkRow }) {
 
           {/* "Bring on day one" option — only shown for forms that legally
               require in-person handling (e.g. I-9 document inspection). */}
-          {item.allowBringOnDay1 && !item.submittedFileUrl && (
+          {item.allowBringOnDay1 && item.status === "pending" && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/40 dark:bg-amber-950/20">
               {item.bringsOnDay1 ? (
                 <div className="flex items-center justify-between gap-3">
@@ -336,7 +343,7 @@ function PaperworkCard({ item }: { item: PaperworkRow }) {
                 type="submit"
                 className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
               >
-                {item.submittedFileUrl ? "Replace file" : "Submit form"}
+                {item.status === "pending" ? "Submit form" : "Replace file"}
               </button>
             </form>
           )}

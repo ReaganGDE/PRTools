@@ -484,7 +484,7 @@ export default async function OnboardingAdminPage({
                                     {p.templateFileName ?? "Template file"}
                                   </a>
                                 )}
-                                {p.submittedFileUrl && (
+                                {p.submittedFileUrl ? (
                                   <a
                                     href={p.submittedFileUrl}
                                     target="_blank"
@@ -494,6 +494,13 @@ export default async function OnboardingAdminPage({
                                     <FileText className="h-3.5 w-3.5" />
                                     {p.submittedFileName ?? "Submitted file"}
                                   </a>
+                                ) : (
+                                  p.status !== "pending" && (
+                                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                                      <FileText className="h-3.5 w-3.5" />
+                                      {p.submittedFileName ?? "Saved to SharePoint"}
+                                    </span>
+                                  )
                                 )}
                               </div>
                               <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-4 dark:border-zinc-800/60">
@@ -508,7 +515,7 @@ export default async function OnboardingAdminPage({
                                     Delete
                                   </Button>
                                 </form>
-                                {p.submittedFileUrl && p.status !== "approved" && (
+                                {p.status === "submitted" && (
                                   <form action={approveAction}>
                                     <Button type="submit" variant="outline" size="sm">
                                       <Check className="mr-1.5 h-3.5 w-3.5" />

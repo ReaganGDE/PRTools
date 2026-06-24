@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { eq, and, inArray } from "drizzle-orm";
-import { put } from "@vercel/blob";
 import { db } from "@/lib/db";
 import { onboardingPaperwork, onboardingQuestions, users } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
+import { storeCompletedPaperwork } from "@/lib/onboarding-storage";
 import { resend } from "@/lib/email/resend";
 import { env } from "@/lib/env";
 
@@ -151,17 +151,25 @@ export async function submitPaperwork(paperworkId: string, formData: FormData) {
 
   if (!row) throw new Error("Not found");
 
-  const blob = await put(
-    `onboarding-paperwork/${paperworkId}-${file.name}`,
-    file,
-    { access: "public", addRandomSuffix: true },
-  );
+  // Look up the employee so SharePoint files can be foldered by person.
+  const [employee] = await db
+    .select({ name: users.name, email: users.email })
+    .from(users)
+    .where(eq(users.id, session.userId))
+    .limit(1);
+
+  const stored = await storeCompletedPaperwork(file, {
+    paperworkId,
+    documentTitle: row.title,
+    employeeName: employee?.name || employee?.email || "Onboarding",
+    employeeEmail: employee?.email ?? null,
+  });
 
   await db
     .update(onboardingPaperwork)
     .set({
-      submittedFileUrl: blob.url,
-      submittedFileName: file.name,
+      submittedFileUrl: stored.url,
+      submittedFileName: stored.name,
       status: "submitted",
       submittedAt: new Date(),
       updatedAt: new Date(),
