@@ -13,6 +13,7 @@ import {
 import { db } from "@/lib/db";
 import {
   onboardingPaperwork,
+  onboardingPaperworkTemplates,
   onboardingLearnings,
   resources,
   resourceGroupMembers,
@@ -22,10 +23,12 @@ import {
 import { requireSessionWithCap } from "@/lib/auth-helpers";
 import { ensurePaperworkForUser } from "@/lib/onboarding-paperwork";
 import { PageHeader } from "@/components/page-header";
-import { submitPaperwork } from "./actions";
+import { submitPaperwork, setBringsOnDay1 } from "./actions";
 import { QuestionBox } from "./question-box";
 
-type Paperwork = typeof onboardingPaperwork.$inferSelect;
+type PaperworkRow = typeof onboardingPaperwork.$inferSelect & {
+  allowBringOnDay1: boolean | null;
+};
 type Learning = typeof onboardingLearnings.$inferSelect;
 type Resource = typeof resources.$inferSelect;
 
@@ -44,8 +47,31 @@ export default async function PortalPage() {
     allResources,
   ] = await Promise.all([
     db
-      .select()
+      .select({
+        id: onboardingPaperwork.id,
+        workspaceId: onboardingPaperwork.workspaceId,
+        userId: onboardingPaperwork.userId,
+        templateId: onboardingPaperwork.templateId,
+        title: onboardingPaperwork.title,
+        description: onboardingPaperwork.description,
+        templateUrl: onboardingPaperwork.templateUrl,
+        templateFileUrl: onboardingPaperwork.templateFileUrl,
+        templateFileName: onboardingPaperwork.templateFileName,
+        submittedFileUrl: onboardingPaperwork.submittedFileUrl,
+        submittedFileName: onboardingPaperwork.submittedFileName,
+        bringsOnDay1: onboardingPaperwork.bringsOnDay1,
+        status: onboardingPaperwork.status,
+        submittedAt: onboardingPaperwork.submittedAt,
+        createdBy: onboardingPaperwork.createdBy,
+        createdAt: onboardingPaperwork.createdAt,
+        updatedAt: onboardingPaperwork.updatedAt,
+        allowBringOnDay1: onboardingPaperworkTemplates.allowBringOnDay1,
+      })
       .from(onboardingPaperwork)
+      .leftJoin(
+        onboardingPaperworkTemplates,
+        eq(onboardingPaperwork.templateId, onboardingPaperworkTemplates.id),
+      )
       .where(
         and(
           eq(onboardingPaperwork.userId, session.userId),
@@ -178,7 +204,7 @@ function CardShell({ children }: { children: ReactNode }) {
   );
 }
 
-const statusBadge: Record<Paperwork["status"], string> = {
+const statusBadge: Record<PaperworkRow["status"], string> = {
   pending:
     "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
   submitted:
@@ -187,8 +213,9 @@ const statusBadge: Record<Paperwork["status"], string> = {
     "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400",
 };
 
-function PaperworkCard({ item }: { item: Paperwork }) {
+function PaperworkCard({ item }: { item: PaperworkRow }) {
   const uploadAction = submitPaperwork.bind(null, item.id);
+  const setDay1Action = setBringsOnDay1.bind(null, item.id);
   const templateHref = item.templateFileUrl || item.templateUrl;
 
   return (
@@ -254,24 +281,65 @@ function PaperworkCard({ item }: { item: Paperwork }) {
             </div>
           )}
 
-          <form
-            action={uploadAction}
-            encType="multipart/form-data"
-            className="flex flex-wrap items-center gap-3 pt-1"
-          >
-            <input
-              type="file"
-              name="file"
-              required
-              className="block text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:text-zinc-400 dark:file:bg-zinc-800 dark:file:text-zinc-200 dark:hover:file:bg-zinc-700"
-            />
-            <button
-              type="submit"
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          {/* "Bring on day one" option — only shown for forms that legally
+              require in-person handling (e.g. I-9 document inspection). */}
+          {item.allowBringOnDay1 && !item.submittedFileUrl && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/40 dark:bg-amber-950/20">
+              {item.bringsOnDay1 ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-400">
+                    <CheckCircle2 className="h-4 w-4" />
+                    You&apos;ll bring the completed form on your first day
+                  </span>
+                  <form action={setDay1Action}>
+                    <input type="hidden" name="bringsOnDay1" value="false" />
+                    <button
+                      type="submit"
+                      className="text-xs text-zinc-400 underline hover:text-zinc-600"
+                    >
+                      Undo
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <form action={setDay1Action} className="flex items-center gap-2">
+                  <input type="hidden" name="bringsOnDay1" value="true" />
+                  <button
+                    type="submit"
+                    className="flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    I&apos;ll bring the completed form on day one
+                  </button>
+                  <span className="text-xs text-amber-600/60 dark:text-amber-500/60">
+                    (required in person)
+                  </span>
+                </form>
+              )}
+            </div>
+          )}
+
+          {/* Upload section — hidden if they've opted to bring on day one */}
+          {!item.bringsOnDay1 && (
+            <form
+              action={uploadAction}
+              encType="multipart/form-data"
+              className="flex flex-wrap items-center gap-3 pt-1"
             >
-              {item.submittedFileUrl ? "Re-upload" : "Upload completed"}
-            </button>
-          </form>
+              <input
+                type="file"
+                name="file"
+                required
+                className="block text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:text-zinc-400 dark:file:bg-zinc-800 dark:file:text-zinc-200 dark:hover:file:bg-zinc-700"
+              />
+              <button
+                type="submit"
+                className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              >
+                {item.submittedFileUrl ? "Replace file" : "Submit form"}
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </CardShell>

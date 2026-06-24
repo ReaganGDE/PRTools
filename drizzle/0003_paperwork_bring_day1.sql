@@ -1,0 +1,2 @@
+ALTER TABLE "onboarding_paperwork" ADD COLUMN "brings_on_day1" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "onboarding_paperwork_templates" ADD COLUMN "allow_bring_on_day1" boolean DEFAULT false NOT NULL;

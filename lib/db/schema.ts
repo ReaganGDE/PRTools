@@ -772,6 +772,7 @@ export const onboardingPaperwork = pgTable("onboarding_paperwork", {
   templateFileName: text("template_file_name"),
   submittedFileUrl: text("submitted_file_url"),
   submittedFileName: text("submitted_file_name"),
+  bringsOnDay1: boolean("brings_on_day1").default(false).notNull(),
   status: onboardingPaperworkStatusEnum("status").default("pending").notNull(),
   submittedAt: timestamp("submitted_at"),
   createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -796,6 +797,10 @@ export const onboardingPaperworkTemplates = pgTable("onboarding_paperwork_templa
   templateFileUrl: text("template_file_url"),
   templateFileName: text("template_file_name"),
   sortOrder: integer("sort_order").default(0).notNull(),
+  // When true, the portal shows a "I'll bring this on day one" checkbox as an
+  // alternative to uploading. Only enable for forms that legally require
+  // physical presentation (e.g. I-9 requires in-person document inspection).
+  allowBringOnDay1: boolean("allow_bring_on_day1").default(false).notNull(),
   createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

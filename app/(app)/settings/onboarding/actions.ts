@@ -195,12 +195,13 @@ export async function updatePaperworkTemplate(
   const description = (formData.get("description") as string | null)?.trim() || null;
   const templateUrl = (formData.get("templateUrl") as string | null)?.trim() || null;
   const sortOrder = Number(formData.get("sortOrder") ?? 0) || 0;
+  const allowBringOnDay1 = formData.get("allowBringOnDay1") === "on";
 
   if (!title) throw new Error("Title is required");
 
   await db
     .update(onboardingPaperworkTemplates)
-    .set({ title, description, templateUrl, sortOrder, updatedAt: new Date() })
+    .set({ title, description, templateUrl, sortOrder, allowBringOnDay1, updatedAt: new Date() })
     .where(
       and(
         eq(onboardingPaperworkTemplates.id, templateId),
@@ -250,6 +251,7 @@ export async function restoreDefaultPaperworkTemplates(_formData?: FormData) {
         templateFileUrl: t.templateFileUrl,
         templateFileName: t.templateFileName,
         sortOrder: t.sortOrder,
+        allowBringOnDay1: t.allowBringOnDay1,
         createdBy: session.userId,
       })),
     );

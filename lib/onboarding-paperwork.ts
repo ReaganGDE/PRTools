@@ -15,6 +15,7 @@ export const DEFAULT_PAPERWORK_TEMPLATES: {
   templateFileUrl: string;
   templateFileName: string;
   sortOrder: number;
+  allowBringOnDay1: boolean;
 }[] = [
   {
     title: "New Hire Form",
@@ -22,6 +23,7 @@ export const DEFAULT_PAPERWORK_TEMPLATES: {
     templateFileUrl: "/onboarding/01-new-hire-form.pdf",
     templateFileName: "New Hire Form.pdf",
     sortOrder: 0,
+    allowBringOnDay1: false,
   },
   {
     title: "Form W-4 — Employee's Withholding Certificate",
@@ -30,6 +32,7 @@ export const DEFAULT_PAPERWORK_TEMPLATES: {
     templateFileUrl: "/onboarding/02-w4-withholding-certificate.pdf",
     templateFileName: "Form W-4.pdf",
     sortOrder: 1,
+    allowBringOnDay1: false,
   },
   {
     title: "Ohio Form IT-4 — Withholding Exemption Certificate",
@@ -37,14 +40,20 @@ export const DEFAULT_PAPERWORK_TEMPLATES: {
     templateFileUrl: "/onboarding/03-ohio-it4-withholding-exemption.pdf",
     templateFileName: "Ohio IT-4.pdf",
     sortOrder: 2,
+    allowBringOnDay1: false,
   },
   {
+    // The I-9 requires the employer to physically inspect original identity/work-
+    // authorization documents in person — a digital upload satisfies the form
+    // itself but cannot replace the in-person document examination (8 U.S.C.
+    // § 1324a). "Bring on day one" is therefore the legally-correct workflow.
     title: "Form I-9 — Employment Eligibility Verification",
     description:
-      "Confirms your identity and authorization to work in the U.S. Bring acceptable documents (see the form's List A / B & C).",
+      "Confirms your identity and authorization to work in the U.S. You must bring original documents (List A, or List B + C) on your first day for in-person verification.",
     templateFileUrl: "/onboarding/04-i9-employment-eligibility.pdf",
     templateFileName: "Form I-9.pdf",
     sortOrder: 3,
+    allowBringOnDay1: true,
   },
   {
     title: "Ohio New Hire Reporting",
@@ -52,14 +61,16 @@ export const DEFAULT_PAPERWORK_TEMPLATES: {
     templateFileUrl: "/onboarding/05-ohio-new-hire-reporting.pdf",
     templateFileName: "Ohio New Hire Reporting.pdf",
     sortOrder: 4,
+    allowBringOnDay1: false,
   },
   {
     title: "Direct Deposit Authorization",
     description:
-      "Authorize payroll direct deposit. Attach a voided check or bank letter if requested.",
+      "Authorize payroll direct deposit. Attach a voided check or bank letter.",
     templateFileUrl: "/onboarding/06-direct-deposit-authorization.pdf",
     templateFileName: "Direct Deposit Authorization.pdf",
     sortOrder: 5,
+    allowBringOnDay1: false,
   },
 ];
 
@@ -82,6 +93,7 @@ export async function ensureDefaultPaperworkTemplates(workspaceId: string) {
       templateFileUrl: t.templateFileUrl,
       templateFileName: t.templateFileName,
       sortOrder: t.sortOrder,
+      allowBringOnDay1: t.allowBringOnDay1,
     })),
   );
 }

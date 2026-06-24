@@ -340,6 +340,23 @@ export default async function OnboardingAdminPage({
                             defaultValue={t.sortOrder}
                           />
                         </div>
+                        <div className="flex items-start gap-2 sm:col-span-2">
+                          <input
+                            type="checkbox"
+                            id={`t-day1-${t.id}`}
+                            name="allowBringOnDay1"
+                            defaultChecked={t.allowBringOnDay1}
+                            className="mt-0.5 rounded accent-indigo-600"
+                          />
+                          <div>
+                            <label htmlFor={`t-day1-${t.id}`} className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                              Allow &ldquo;bring on day one&rdquo;
+                            </label>
+                            <p className="text-xs text-zinc-400">
+                              Shows a checkbox in the portal letting the employee indicate they&apos;ll bring the completed form physically. Only enable for forms that legally require in-person handling (I-9).
+                            </p>
+                          </div>
+                        </div>
                       </div>
 
                       <div className="mt-5 flex items-center justify-between border-t border-zinc-100 pt-4 dark:border-zinc-800/60">
@@ -430,8 +447,13 @@ export default async function OnboardingAdminPage({
                               key={p.id}
                               className="rounded-xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900"
                             >
-                              <div className="mb-2 flex items-center gap-2">
+                              <div className="mb-2 flex flex-wrap items-center gap-2">
                                 <StatusBadge status={p.status} />
+                                {p.bringsOnDay1 && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
+                                    Bringing on day one
+                                  </span>
+                                )}
                                 <span className="flex-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
                                   {p.title}
                                 </span>

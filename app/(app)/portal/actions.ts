@@ -102,6 +102,33 @@ export async function submitQuestion(formData: FormData) {
   revalidatePath("/portal");
 }
 
+export async function setBringsOnDay1(paperworkId: string, formData: FormData) {
+  const session = await requireSessionWithCap("onboarding.view");
+
+  const value = formData.get("bringsOnDay1") === "true";
+
+  const [row] = await db
+    .select({ id: onboardingPaperwork.id })
+    .from(onboardingPaperwork)
+    .where(
+      and(
+        eq(onboardingPaperwork.id, paperworkId),
+        eq(onboardingPaperwork.userId, session.userId),
+        eq(onboardingPaperwork.workspaceId, session.workspaceId),
+      ),
+    )
+    .limit(1);
+
+  if (!row) throw new Error("Not found");
+
+  await db
+    .update(onboardingPaperwork)
+    .set({ bringsOnDay1: value, updatedAt: new Date() })
+    .where(eq(onboardingPaperwork.id, paperworkId));
+
+  revalidatePath("/portal");
+}
+
 export async function submitPaperwork(paperworkId: string, formData: FormData) {
   const session = await requireSessionWithCap("onboarding.view");
 
