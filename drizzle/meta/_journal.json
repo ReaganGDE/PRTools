@@ -15,6 +15,13 @@
       "when": 1782240685157,
       "tag": "0001_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782319556596,
+      "tag": "0002_onboarding_paperwork_templates",
+      "breakpoints": true
     }
   ]
 }

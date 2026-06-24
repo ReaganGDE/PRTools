@@ -20,6 +20,7 @@ import {
   resourceUserAssignments,
 } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
+import { ensurePaperworkForUser } from "@/lib/onboarding-paperwork";
 import { PageHeader } from "@/components/page-header";
 import { submitPaperwork } from "./actions";
 import { QuestionBox } from "./question-box";
@@ -30,6 +31,10 @@ type Resource = typeof resources.$inferSelect;
 
 export default async function PortalPage() {
   const session = await requireSessionWithCap("onboarding.view");
+
+  // Make sure this onboardee has a paperwork row for every standard template
+  // before we read their list (instantiates the new-hire packet on first view).
+  await ensurePaperworkForUser(session.userId, session.workspaceId);
 
   const [
     paperwork,

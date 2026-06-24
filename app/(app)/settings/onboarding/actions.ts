@@ -7,9 +7,11 @@ import { db } from "@/lib/db";
 import {
   users,
   onboardingPaperwork,
+  onboardingPaperworkTemplates,
   onboardingLearnings,
 } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
+import { DEFAULT_PAPERWORK_TEMPLATES } from "@/lib/onboarding-paperwork";
 
 function revalidate() {
   revalidatePath("/settings/onboarding");
@@ -155,6 +157,103 @@ export async function deleteLearning(learningId: string, _formData: FormData) {
         eq(onboardingLearnings.workspaceId, session.workspaceId),
       ),
     );
+
+  revalidate();
+}
+
+// ─── Paperwork templates (required for every new hire) ──────────────────────
+
+export async function createPaperworkTemplate(formData: FormData) {
+  const session = await requireSessionWithCap("onboarding.admin");
+
+  const title = String(formData.get("title") ?? "").trim();
+  const description = (formData.get("description") as string | null)?.trim() || null;
+  const templateUrl = (formData.get("templateUrl") as string | null)?.trim() || null;
+  const sortOrder = Number(formData.get("sortOrder") ?? 0) || 0;
+
+  if (!title) throw new Error("Title is required");
+
+  await db.insert(onboardingPaperworkTemplates).values({
+    workspaceId: session.workspaceId,
+    title,
+    description,
+    templateUrl,
+    sortOrder,
+    createdBy: session.userId,
+  });
+
+  revalidate();
+}
+
+export async function updatePaperworkTemplate(
+  templateId: string,
+  formData: FormData,
+) {
+  const session = await requireSessionWithCap("onboarding.admin");
+
+  const title = String(formData.get("title") ?? "").trim();
+  const description = (formData.get("description") as string | null)?.trim() || null;
+  const templateUrl = (formData.get("templateUrl") as string | null)?.trim() || null;
+  const sortOrder = Number(formData.get("sortOrder") ?? 0) || 0;
+
+  if (!title) throw new Error("Title is required");
+
+  await db
+    .update(onboardingPaperworkTemplates)
+    .set({ title, description, templateUrl, sortOrder, updatedAt: new Date() })
+    .where(
+      and(
+        eq(onboardingPaperworkTemplates.id, templateId),
+        eq(onboardingPaperworkTemplates.workspaceId, session.workspaceId),
+      ),
+    );
+
+  revalidate();
+}
+
+export async function deletePaperworkTemplate(
+  templateId: string,
+  _formData: FormData,
+) {
+  const session = await requireSessionWithCap("onboarding.admin");
+
+  await db
+    .delete(onboardingPaperworkTemplates)
+    .where(
+      and(
+        eq(onboardingPaperworkTemplates.id, templateId),
+        eq(onboardingPaperworkTemplates.workspaceId, session.workspaceId),
+      ),
+    );
+
+  revalidate();
+}
+
+// Re-seed the standard new-hire packet (the 6 documents) for this workspace.
+// Skips any template whose title already exists so it won't create duplicates.
+export async function restoreDefaultPaperworkTemplates(_formData?: FormData) {
+  const session = await requireSessionWithCap("onboarding.admin");
+
+  const existing = await db
+    .select({ title: onboardingPaperworkTemplates.title })
+    .from(onboardingPaperworkTemplates)
+    .where(eq(onboardingPaperworkTemplates.workspaceId, session.workspaceId));
+  const haveTitles = new Set(existing.map((e) => e.title));
+
+  const toAdd = DEFAULT_PAPERWORK_TEMPLATES.filter((t) => !haveTitles.has(t.title));
+  if (toAdd.length > 0) {
+    await db.insert(onboardingPaperworkTemplates).values(
+      toAdd.map((t) => ({
+        workspaceId: session.workspaceId,
+        title: t.title,
+        description: t.description,
+        templateFileUrl: t.templateFileUrl,
+        templateFileName: t.templateFileName,
+        sortOrder: t.sortOrder,
+        createdBy: session.userId,
+      })),
+    );
+  }
 
   revalidate();
 }

@@ -16,10 +16,12 @@ import { db } from "@/lib/db";
 import {
   users,
   onboardingPaperwork,
+  onboardingPaperworkTemplates,
   onboardingLearnings,
   onboardingQuestions,
 } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
+import { ensureDefaultPaperworkTemplates } from "@/lib/onboarding-paperwork";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +36,10 @@ import {
   deleteLearning,
   createTestUser,
   startImpersonation,
+  createPaperworkTemplate,
+  updatePaperworkTemplate,
+  deletePaperworkTemplate,
+  restoreDefaultPaperworkTemplates,
 } from "./actions";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -53,9 +59,10 @@ function StatusBadge({ status }: { status: "pending" | "submitted" | "approved" 
   );
 }
 
-const TABS = ["people", "paperwork", "learnings", "questions"] as const;
+const TABS = ["people", "required", "paperwork", "learnings", "questions"] as const;
 const TAB_LABELS: Record<(typeof TABS)[number], string> = {
   people: "People",
+  required: "Required docs",
   paperwork: "Paperwork",
   learnings: "Learnings",
   questions: "Questions",
@@ -69,6 +76,11 @@ export default async function OnboardingAdminPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await requireSessionWithCap("onboarding.admin");
+
+  // Seed the standard new-hire packet the first time this workspace opens the
+  // page (no-op once any templates exist).
+  await ensureDefaultPaperworkTemplates(session.workspaceId);
+
   const params = await searchParams;
   const rawTab = (params.tab as string | undefined) ?? "people";
   const tab = (TABS as readonly string[]).includes(rawTab)
@@ -76,7 +88,8 @@ export default async function OnboardingAdminPage({
     : "people";
 
   // Load all data in parallel
-  const [workspaceUsers, paperworkList, learningList, questionList] = await Promise.all([
+  const [workspaceUsers, templateList, paperworkList, learningList, questionList] =
+    await Promise.all([
     db
       .select({
         id: users.id,
@@ -88,6 +101,11 @@ export default async function OnboardingAdminPage({
       .from(users)
       .where(eq(users.workspaceId, session.workspaceId))
       .orderBy(users.name),
+    db
+      .select()
+      .from(onboardingPaperworkTemplates)
+      .where(eq(onboardingPaperworkTemplates.workspaceId, session.workspaceId))
+      .orderBy(onboardingPaperworkTemplates.sortOrder),
     db
       .select()
       .from(onboardingPaperwork)
@@ -216,7 +234,9 @@ export default async function OnboardingAdminPage({
                 <UserPlus className="h-4 w-4" /> Create test user
               </div>
               <p className="mb-3 text-xs text-zinc-500">
-                Creates a user account directly — no invite email needed. They won't be able to sign in until they use magic link or Google with this email. Use "View as" to preview their experience without them logging in.
+                Creates a user account directly — no invite email needed. They won&apos;t be able to
+                sign in until they use magic link or Google with this email. Use &ldquo;View
+                as&rdquo; to preview their experience without them logging in.
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="grid gap-1.5">
@@ -231,6 +251,153 @@ export default async function OnboardingAdminPage({
               <div className="mt-4 flex justify-end">
                 <Button type="submit">Create &amp; set to onboarding</Button>
               </div>
+            </form>
+          </>
+        )}
+
+        {/* ─── Required docs (templates) ──────────────────────────────── */}
+        {tab === "required" && (
+          <>
+            <div className="flex items-start gap-2 rounded-xl border border-zinc-200/80 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800/60 dark:bg-zinc-900 dark:text-zinc-400">
+              <FileText className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+              <p>
+                These documents are given to <strong>every</strong> new hire automatically. When an
+                onboardee opens their portal, each one appears as a paperwork item for them to
+                download, complete, and upload back.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {templateList.map((t) => {
+                const updateAction = updatePaperworkTemplate.bind(null, t.id);
+                const deleteAction = deletePaperworkTemplate.bind(null, t.id);
+                const fileHref = t.templateFileUrl || t.templateUrl;
+                return (
+                  <div
+                    key={t.id}
+                    className="rounded-xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900"
+                  >
+                    <form action={updateAction} className="p-5">
+                      <div className="mb-4 flex flex-wrap items-center gap-2">
+                        <FileText className="h-4 w-4 text-zinc-400" />
+                        <span className="flex-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                          {t.title}
+                        </span>
+                        {fileHref && (
+                          <a
+                            href={fileHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            {t.templateFileName ?? "View template"}
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-1.5 sm:col-span-2">
+                          <Label htmlFor={`t-title-${t.id}`}>Title</Label>
+                          <Input
+                            id={`t-title-${t.id}`}
+                            name="title"
+                            defaultValue={t.title}
+                            required
+                          />
+                        </div>
+                        <div className="grid gap-1.5 sm:col-span-2">
+                          <Label htmlFor={`t-desc-${t.id}`}>Description</Label>
+                          <Input
+                            id={`t-desc-${t.id}`}
+                            name="description"
+                            defaultValue={t.description ?? ""}
+                            placeholder="Optional instructions"
+                          />
+                        </div>
+                        <div className="grid gap-1.5 sm:col-span-2">
+                          <Label htmlFor={`t-url-${t.id}`}>Template link (optional)</Label>
+                          <Input
+                            id={`t-url-${t.id}`}
+                            name="templateUrl"
+                            type="url"
+                            defaultValue={t.templateUrl ?? ""}
+                            placeholder="https://"
+                          />
+                          {t.templateFileUrl && (
+                            <p className="text-xs text-zinc-400">
+                              A bundled file template is attached ({t.templateFileName}). A link here
+                              is shown in addition.
+                            </p>
+                          )}
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label htmlFor={`t-sort-${t.id}`}>Sort order</Label>
+                          <Input
+                            id={`t-sort-${t.id}`}
+                            name="sortOrder"
+                            type="number"
+                            defaultValue={t.sortOrder}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-5 flex items-center justify-between border-t border-zinc-100 pt-4 dark:border-zinc-800/60">
+                        <Button
+                          type="submit"
+                          formAction={deleteAction}
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Remove
+                        </Button>
+                        <Button type="submit" variant="outline" size="sm">
+                          Save changes
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Add custom required doc */}
+            <form
+              action={createPaperworkTemplate}
+              className="rounded-xl border border-dashed border-zinc-300 p-5 dark:border-zinc-700"
+            >
+              <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
+                <Plus className="h-4 w-4" /> Add a required document
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5 sm:col-span-2">
+                  <Label htmlFor="new-t-title">Title</Label>
+                  <Input id="new-t-title" name="title" required placeholder="e.g. NDA" />
+                </div>
+                <div className="grid gap-1.5 sm:col-span-2">
+                  <Label htmlFor="new-t-desc">Description</Label>
+                  <Input id="new-t-desc" name="description" placeholder="Optional instructions" />
+                </div>
+                <div className="grid gap-1.5 sm:col-span-2">
+                  <Label htmlFor="new-t-url">Template link (optional)</Label>
+                  <Input id="new-t-url" name="templateUrl" type="url" placeholder="https://" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="new-t-sort">Sort order</Label>
+                  <Input id="new-t-sort" name="sortOrder" type="number" defaultValue={templateList.length} />
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Button type="submit">Add document</Button>
+              </div>
+            </form>
+
+            <form action={restoreDefaultPaperworkTemplates}>
+              <Button type="submit" variant="ghost" size="sm" className="text-zinc-500">
+                Restore standard new-hire packet
+              </Button>
             </form>
           </>
         )}

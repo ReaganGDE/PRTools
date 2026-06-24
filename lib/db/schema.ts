@@ -764,6 +764,7 @@ export const onboardingPaperwork = pgTable("onboarding_paperwork", {
   id: id(),
   workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  templateId: text("template_id").references(() => onboardingPaperworkTemplates.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   description: text("description"),
   templateUrl: text("template_url"),
@@ -780,6 +781,25 @@ export const onboardingPaperwork = pgTable("onboarding_paperwork", {
   index("onboarding_paperwork_workspace_idx").on(t.workspaceId),
   index("onboarding_paperwork_user_idx").on(t.userId),
 ]);
+
+// A standard paperwork template every new hire in the workspace must complete.
+// When an onboardee opens the portal, one onboarding_paperwork row is
+// instantiated per template (linked via templateId) so they can upload the
+// completed copy. Editing/deleting a template does not retroactively change
+// already-instantiated rows.
+export const onboardingPaperworkTemplates = pgTable("onboarding_paperwork_templates", {
+  id: id(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  templateUrl: text("template_url"),
+  templateFileUrl: text("template_file_url"),
+  templateFileName: text("template_file_name"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [index("onboarding_paperwork_templates_workspace_idx").on(t.workspaceId)]);
 
 // A learning resource shown to all onboardees in the workspace. Either a link
 // out, or inline rich text the admin writes directly.
@@ -911,5 +931,6 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 export type ResourceGroup = typeof resourceGroups.$inferSelect;
 export type Resource = typeof resources.$inferSelect;
 export type OnboardingPaperwork = typeof onboardingPaperwork.$inferSelect;
+export type OnboardingPaperworkTemplate = typeof onboardingPaperworkTemplates.$inferSelect;
 export type OnboardingLearning = typeof onboardingLearnings.$inferSelect;
 export type OnboardingQuestion = typeof onboardingQuestions.$inferSelect;
