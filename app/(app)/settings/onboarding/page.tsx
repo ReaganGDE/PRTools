@@ -9,6 +9,8 @@ import {
   Trash2,
   Check,
   ExternalLink,
+  Eye,
+  UserPlus,
 } from "lucide-react";
 import { db } from "@/lib/db";
 import {
@@ -30,6 +32,8 @@ import {
   createLearning,
   updateLearning,
   deleteLearning,
+  createTestUser,
+  startImpersonation,
 } from "./actions";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -159,6 +163,7 @@ export default async function OnboardingAdminPage({
             <div className="space-y-3">
               {workspaceUsers.map((u) => {
                 const toggleAction = setUserOnboarding.bind(null, u.id);
+                const viewAsAction = startImpersonation.bind(null, u.id);
                 return (
                   <div
                     key={u.id}
@@ -173,24 +178,60 @@ export default async function OnboardingAdminPage({
                         <span className="ml-2 text-zinc-400">{u.role}</span>
                       </p>
                     </div>
-                    <form action={toggleAction} className="flex items-center gap-3">
-                      <label className="flex items-center gap-1.5 text-sm">
-                        <input
-                          type="checkbox"
-                          name="enabled"
-                          defaultChecked={u.isOnboarding}
-                          className="rounded accent-indigo-600"
-                        />
-                        Onboarding
-                      </label>
-                      <Button type="submit" variant="outline" size="sm">
-                        Save
-                      </Button>
-                    </form>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {u.isOnboarding && (
+                        <form action={viewAsAction}>
+                          <Button type="submit" variant="ghost" size="sm" className="gap-1.5 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/30">
+                            <Eye className="h-3.5 w-3.5" />
+                            View as
+                          </Button>
+                        </form>
+                      )}
+                      <form action={toggleAction} className="flex items-center gap-3">
+                        <label className="flex items-center gap-1.5 text-sm">
+                          <input
+                            type="checkbox"
+                            name="enabled"
+                            defaultChecked={u.isOnboarding}
+                            className="rounded accent-indigo-600"
+                          />
+                          Onboarding
+                        </label>
+                        <Button type="submit" variant="outline" size="sm">
+                          Save
+                        </Button>
+                      </form>
+                    </div>
                   </div>
                 );
               })}
             </div>
+
+            {/* Create test user */}
+            <form
+              action={createTestUser}
+              className="rounded-xl border border-dashed border-zinc-300 p-5 dark:border-zinc-700"
+            >
+              <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
+                <UserPlus className="h-4 w-4" /> Create test user
+              </div>
+              <p className="mb-3 text-xs text-zinc-500">
+                Creates a user account directly — no invite email needed. They won't be able to sign in until they use magic link or Google with this email. Use "View as" to preview their experience without them logging in.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="test-name">Name</Label>
+                  <Input id="test-name" name="name" placeholder="Jane Smith" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="test-email">Email</Label>
+                  <Input id="test-email" name="email" type="email" required placeholder="email@example.com" />
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Button type="submit">Create &amp; set to onboarding</Button>
+              </div>
+            </form>
           </>
         )}
 

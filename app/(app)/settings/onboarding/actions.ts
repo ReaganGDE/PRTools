@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
@@ -155,4 +157,60 @@ export async function deleteLearning(learningId: string, _formData: FormData) {
     );
 
   revalidate();
+}
+
+// ─── Test users ─────────────────────────────────────────────────────────────
+
+export async function createTestUser(formData: FormData) {
+  const session = await requireSessionWithCap("onboarding.admin");
+
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const name = (formData.get("name") as string | null)?.trim() || null;
+
+  if (!email) throw new Error("Email is required");
+
+  const existing = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email));
+  if (existing.length > 0) throw new Error("A user with that email already exists");
+
+  await db.insert(users).values({
+    email,
+    name,
+    workspaceId: session.workspaceId,
+    role: "member",
+    isOnboarding: true,
+  });
+
+  revalidate();
+}
+
+// ─── Impersonation ──────────────────────────────────────────────────────────
+
+export async function startImpersonation(userId: string, _formData: FormData) {
+  const session = await requireSessionWithCap("onboarding.admin");
+
+  const [target] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.workspaceId, session.workspaceId)));
+
+  if (!target) throw new Error("User not found");
+
+  const jar = await cookies();
+  jar.set("preview_user_id", userId, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 60 * 60,
+  });
+
+  redirect("/portal");
+}
+
+export async function stopImpersonation(_formData?: FormData) {
+  const jar = await cookies();
+  jar.delete("preview_user_id");
+  redirect("/settings/onboarding");
 }
