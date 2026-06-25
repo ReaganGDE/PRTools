@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = [
   "/login",
+  "/change-password",
   "/verify",
   "/api/auth",
   "/api/webhooks",

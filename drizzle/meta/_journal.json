@@ -43,6 +43,13 @@
       "when": 1782403774758,
       "tag": "0005_early_titanium_man",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782404726352,
+      "tag": "0006_red_dragon_lord",
+      "breakpoints": true
     }
   ]
 }

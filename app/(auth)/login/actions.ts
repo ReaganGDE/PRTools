@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -22,13 +23,24 @@ export async function loginWithPassword(formData: FormData) {
   if (!email || !password) fail();
 
   const [user] = await db
-    .select({ id: users.id, passwordHash: users.passwordHash })
+    .select({ id: users.id, passwordHash: users.passwordHash, mustChangePassword: users.mustChangePassword })
     .from(users)
     .where(eq(users.email, email))
     .limit(1);
 
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     fail();
+  }
+
+  if (user!.mustChangePassword) {
+    const jar = await cookies();
+    jar.set("pending_pw_change_for", user!.id, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60,
+    });
+    redirect("/change-password");
   }
 
   await createSessionForUser(user!.id);

@@ -288,6 +288,7 @@ export async function createTestUser(formData: FormData) {
     role: "member",
     isOnboarding: true,
     passwordHash: password ? await hashPassword(password) : null,
+    mustChangePassword: !!password,
   });
 
   revalidate();
@@ -315,7 +316,7 @@ export async function setUserPassword(userId: string, formData: FormData) {
 
   await db
     .update(users)
-    .set({ passwordHash: await hashPassword(password) })
+    .set({ passwordHash: await hashPassword(password), mustChangePassword: true })
     .where(eq(users.id, userId));
 
   revalidate();

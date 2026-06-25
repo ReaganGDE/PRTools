@@ -30,7 +30,7 @@ export async function setMyPassword(
   // can never overwrite their password.
   await db
     .update(users)
-    .set({ passwordHash: hash })
+    .set({ passwordHash: hash, mustChangePassword: false })
     .where(eq(users.id, session.realUserId));
 
   revalidatePath("/settings");

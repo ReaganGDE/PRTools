@@ -133,6 +133,7 @@ export const users = pgTable("users", {
   emailVerified: timestamp("email_verified"),
   image: text("image"),
   passwordHash: text("password_hash"),
+  mustChangePassword: boolean("must_change_password").default(false).notNull(),
   workspaceId: text("workspace_id").references(() => workspaces.id, {
     onDelete: "set null",
   }),

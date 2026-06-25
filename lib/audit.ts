@@ -29,6 +29,7 @@ export type AuditAction =
   | "team.role.change"
   | "team.remove"
   | "team.transfer_ownership"
+  | "team.password.reset"
   // Exports
   | "export.contacts"
   | "export.sends"

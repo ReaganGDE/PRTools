@@ -1,12 +1,13 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { requireSession, requireSessionWithCap } from "@/lib/auth-helpers";
 import { createInvite, revokeInvite } from "@/lib/invites";
 import { logAudit } from "@/lib/audit";
+import { hashPassword } from "@/lib/password";
 
 const ToolAccessInput = z.object({
   userId: z.string(),
@@ -146,6 +147,40 @@ export async function removeMember(userId: string) {
     targetId: userId,
     meta: { previousRole: target.role },
   });
+  revalidatePath("/settings/team");
+}
+
+export async function resetMemberPassword(userId: string, formData: FormData) {
+  const session = await requireSessionWithCap("team.role.change");
+
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8) {
+    throw new Error("Password must be at least 8 characters.");
+  }
+
+  const [target] = await db
+    .select({ id: users.id, role: users.role })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.workspaceId, session.workspaceId)));
+
+  if (!target) throw new Error("User not found in this workspace");
+  if (target.role === "owner") {
+    throw new Error("The owner sets their own password from Settings.");
+  }
+
+  await db
+    .update(users)
+    .set({ passwordHash: await hashPassword(password), mustChangePassword: true })
+    .where(eq(users.id, userId));
+
+  await logAudit({
+    workspaceId: session.workspaceId,
+    userId: session.userId,
+    action: "team.password.reset",
+    targetType: "user",
+    targetId: userId,
+  });
+
   revalidatePath("/settings/team");
 }
 

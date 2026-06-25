@@ -29,6 +29,7 @@ import {
   changeToolAccess,
   removeMember,
   transferOwnership,
+  resetMemberPassword,
 } from "./actions";
 
 export default async function TeamPage() {
@@ -146,6 +147,38 @@ export default async function TeamPage() {
                       ) : (
                         <ToolAccessBadge access={m.toolAccess} />
                       )}
+
+                      {/* Reset password */}
+                      {canChangeRole && !isOwner && !isSelf ? (
+                        <details className="group relative">
+                          <summary className="cursor-pointer list-none">
+                            <span className="inline-flex h-7 items-center rounded-md border border-zinc-200 bg-white px-2 text-xs hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900">
+                              Reset password
+                            </span>
+                          </summary>
+                          <div className="absolute right-0 z-10 mt-1 w-64 rounded-md border border-zinc-200 bg-white p-3 shadow-md dark:border-zinc-700 dark:bg-zinc-900">
+                            <form
+                              action={resetMemberPassword.bind(null, m.id)}
+                              className="flex flex-col gap-2"
+                            >
+                              <p className="text-xs text-zinc-500">
+                                They&apos;ll be prompted to change it on next sign-in.
+                              </p>
+                              <Input
+                                name="password"
+                                type="password"
+                                placeholder="New password (8+ chars)"
+                                minLength={8}
+                                required
+                                className="h-7 text-xs"
+                              />
+                              <Button type="submit" size="sm" className="w-full">
+                                Set password
+                              </Button>
+                            </form>
+                          </div>
+                        </details>
+                      ) : null}
 
                       {/* Transfer ownership */}
                       {session.role === "owner" && !isSelf && !isOwner ? (
