@@ -36,6 +36,13 @@
       "when": 1782326003599,
       "tag": "0004_absurd_rawhide_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782403774758,
+      "tag": "0005_early_titanium_man",
+      "breakpoints": true
     }
   ]
 }

@@ -132,6 +132,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   emailVerified: timestamp("email_verified"),
   image: text("image"),
+  passwordHash: text("password_hash"),
   workspaceId: text("workspace_id").references(() => workspaces.id, {
     onDelete: "set null",
   }),

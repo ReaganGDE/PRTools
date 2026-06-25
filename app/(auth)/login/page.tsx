@@ -1,4 +1,5 @@
 import { signIn } from "@/lib/auth";
+import { loginWithPassword } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,13 +11,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ callbackUrl?: string; error?: string }>;
 }) {
   const hasGoogle =
     !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
+  const { callbackUrl } = await searchParams;
 
   return (
     <div className="flex min-h-screen items-center justify-center p-6">
@@ -24,9 +26,7 @@ export default function LoginPage({
         <CardHeader>
           <CardTitle>Sign in</CardTitle>
           <CardDescription>
-            {hasGoogle
-              ? "Sign in with Google or get a magic link via email."
-              : "We'll email you a magic link. No password."}
+            Enter your email and password to continue.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -59,18 +59,12 @@ export default function LoginPage({
             </div>
           )}
 
-          <form
-            action={async (formData: FormData) => {
-              "use server";
-              const callback =
-                (await searchParams).callbackUrl ?? "/dashboard";
-              await signIn("resend", {
-                email: formData.get("email") as string,
-                redirectTo: callback,
-              });
-            }}
-            className="flex flex-col gap-4"
-          >
+          <form action={loginWithPassword} className="flex flex-col gap-4">
+            <input
+              type="hidden"
+              name="callbackUrl"
+              value={callbackUrl ?? "/dashboard"}
+            />
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -82,7 +76,18 @@ export default function LoginPage({
                 autoComplete="email"
               />
             </div>
-            <Button type="submit">Email me a link</Button>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="••••••••"
+                required
+                autoComplete="current-password"
+              />
+            </div>
+            <Button type="submit">Sign in</Button>
           </form>
         </CardContent>
       </Card>
@@ -97,11 +102,15 @@ async function ErrorBanner({
 }) {
   const { error } = await searchParams;
   if (!error) return null;
+  const message =
+    error === "CredentialsSignin"
+      ? "Incorrect email or password."
+      : error === "AccessDenied"
+        ? "Access denied. Your account isn't set up yet — ask an admin."
+        : "Something went wrong. Try again.";
   return (
     <div className="rounded-md bg-red-50 p-3 text-sm text-red-900 dark:bg-red-950 dark:text-red-100">
-      {error === "AccessDenied"
-        ? "Access denied. Your email isn't on the invite list yet."
-        : "Something went wrong. Try again."}
+      {message}
     </div>
   );
 }

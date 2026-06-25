@@ -16,6 +16,7 @@ import {
 import { FollowUpDaysForm } from "./follow-up-days-form";
 import { ThemePicker } from "./theme-picker";
 import { RolePreviewPicker } from "./role-preview-picker";
+import { PasswordForm } from "./password-form";
 
 function isSet(name: string) {
   const v = process.env[name];
@@ -107,6 +108,19 @@ export default async function SettingsPage() {
             </CardContent>
           </Card>
         ) : null}
+
+        {/* Password — set/change your own sign-in password */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Password</CardTitle>
+            <CardDescription>
+              Set or change the password you use to sign in.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PasswordForm />
+          </CardContent>
+        </Card>
 
         {/* Appearance — per-user theme preference */}
         <Card>

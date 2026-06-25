@@ -35,6 +35,7 @@ import {
   updateLearning,
   deleteLearning,
   createTestUser,
+  setUserPassword,
   startImpersonation,
   createPaperworkTemplate,
   updatePaperworkTemplate,
@@ -182,44 +183,71 @@ export default async function OnboardingAdminPage({
               {workspaceUsers.map((u) => {
                 const toggleAction = setUserOnboarding.bind(null, u.id);
                 const viewAsAction = startImpersonation.bind(null, u.id);
+                const passwordAction = setUserPassword.bind(null, u.id);
                 return (
                   <div
                     key={u.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900"
+                    className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900"
                   >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                        {u.name ?? u.email}
-                      </p>
-                      <p className="truncate text-xs text-zinc-400">
-                        {u.email}
-                        <span className="ml-2 text-zinc-400">{u.role}</span>
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {u.isOnboarding && (
-                        <form action={viewAsAction}>
-                          <Button type="submit" variant="ghost" size="sm" className="gap-1.5 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/30">
-                            <Eye className="h-3.5 w-3.5" />
-                            View as
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                          {u.name ?? u.email}
+                        </p>
+                        <p className="truncate text-xs text-zinc-400">
+                          {u.email}
+                          <span className="ml-2 text-zinc-400">{u.role}</span>
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {u.isOnboarding && (
+                          <form action={viewAsAction}>
+                            <Button type="submit" variant="ghost" size="sm" className="gap-1.5 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/30">
+                              <Eye className="h-3.5 w-3.5" />
+                              View as
+                            </Button>
+                          </form>
+                        )}
+                        <form action={toggleAction} className="flex items-center gap-3">
+                          <label className="flex items-center gap-1.5 text-sm">
+                            <input
+                              type="checkbox"
+                              name="enabled"
+                              defaultChecked={u.isOnboarding}
+                              className="rounded accent-indigo-600"
+                            />
+                            Onboarding
+                          </label>
+                          <Button type="submit" variant="outline" size="sm">
+                            Save
                           </Button>
                         </form>
-                      )}
-                      <form action={toggleAction} className="flex items-center gap-3">
-                        <label className="flex items-center gap-1.5 text-sm">
-                          <input
-                            type="checkbox"
-                            name="enabled"
-                            defaultChecked={u.isOnboarding}
-                            className="rounded accent-indigo-600"
+                      </div>
+                    </div>
+                    {u.role !== "owner" && (
+                      <form
+                        action={passwordAction}
+                        className="mt-3 flex flex-wrap items-end gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800/60"
+                      >
+                        <div className="grid gap-1.5">
+                          <Label htmlFor={`pw-${u.id}`} className="text-xs text-zinc-500">
+                            Set sign-in password
+                          </Label>
+                          <Input
+                            id={`pw-${u.id}`}
+                            name="password"
+                            type="text"
+                            minLength={8}
+                            required
+                            placeholder="At least 8 characters"
+                            className="h-9 w-64"
                           />
-                          Onboarding
-                        </label>
+                        </div>
                         <Button type="submit" variant="outline" size="sm">
-                          Save
+                          Set password
                         </Button>
                       </form>
-                    </div>
+                    )}
                   </div>
                 );
               })}
@@ -234,9 +262,9 @@ export default async function OnboardingAdminPage({
                 <UserPlus className="h-4 w-4" /> Create test user
               </div>
               <p className="mb-3 text-xs text-zinc-500">
-                Creates a user account directly — no invite email needed. They won&apos;t be able to
-                sign in until they use magic link or Google with this email. Use &ldquo;View
-                as&rdquo; to preview their experience without them logging in.
+                Creates a user account directly — no invite email needed. Set a password here and
+                share it with them, and they can sign in with their email + password right away.
+                Use &ldquo;View as&rdquo; to preview their experience without them logging in.
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="grid gap-1.5">
@@ -246,6 +274,16 @@ export default async function OnboardingAdminPage({
                 <div className="grid gap-1.5">
                   <Label htmlFor="test-email">Email</Label>
                   <Input id="test-email" name="email" type="email" required placeholder="email@example.com" />
+                </div>
+                <div className="grid gap-1.5 sm:col-span-2">
+                  <Label htmlFor="test-password">Password (optional)</Label>
+                  <Input
+                    id="test-password"
+                    name="password"
+                    type="text"
+                    minLength={8}
+                    placeholder="At least 8 characters — leave blank to set later"
+                  />
                 </div>
               </div>
               <div className="mt-4 flex justify-end">

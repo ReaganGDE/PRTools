@@ -12,6 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { requireSessionWithCap } from "@/lib/auth-helpers";
 import { DEFAULT_PAPERWORK_TEMPLATES } from "@/lib/onboarding-paperwork";
+import { hashPassword } from "@/lib/password";
 
 function revalidate() {
   revalidatePath("/settings/onboarding");
@@ -267,8 +268,12 @@ export async function createTestUser(formData: FormData) {
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const name = (formData.get("name") as string | null)?.trim() || null;
+  const password = String(formData.get("password") ?? "");
 
   if (!email) throw new Error("Email is required");
+  if (password && password.length < 8) {
+    throw new Error("Password must be at least 8 characters.");
+  }
 
   const existing = await db
     .select({ id: users.id })
@@ -282,7 +287,36 @@ export async function createTestUser(formData: FormData) {
     workspaceId: session.workspaceId,
     role: "member",
     isOnboarding: true,
+    passwordHash: password ? await hashPassword(password) : null,
   });
+
+  revalidate();
+}
+
+// Admin sets (or resets) another user's sign-in password. Scoped to the
+// admin's own workspace; cannot target the workspace owner.
+export async function setUserPassword(userId: string, formData: FormData) {
+  const session = await requireSessionWithCap("onboarding.admin");
+
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8) {
+    throw new Error("Password must be at least 8 characters.");
+  }
+
+  const [target] = await db
+    .select({ id: users.id, role: users.role })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.workspaceId, session.workspaceId)));
+
+  if (!target) throw new Error("User not found in this workspace");
+  if (target.role === "owner") {
+    throw new Error("The owner sets their own password from Settings.");
+  }
+
+  await db
+    .update(users)
+    .set({ passwordHash: await hashPassword(password) })
+    .where(eq(users.id, userId));
 
   revalidate();
 }
