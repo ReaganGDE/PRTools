@@ -37,10 +37,18 @@ export const CAPABILITIES = {
   "social.view": ["owner", "admin", "member", "viewer"],
   "social.post.create": ["owner", "admin", "member"],
   "social.post.publish": ["owner", "admin"],
+  "social.post.approve": ["owner", "admin"],
   "social.account.connect": ["owner", "admin"],
+  "social.settings.edit": ["owner", "admin"],
+
+  // Resources (shared logins & links)
+  "resources.view": ["owner", "admin", "member", "viewer"],
+  "resources.reveal": ["owner", "admin", "member"], // see stored passwords
+  "resources.manage": ["owner", "admin"],
 
   // Team & workspace
   "team.invite": ["owner", "admin"],
+  "team.department.manage": ["owner", "admin"],
   "team.role.change": ["owner"], // only owner can change roles
   "team.remove": ["owner", "admin"], // admin cannot remove owner
   "workspace.edit": ["owner"],

@@ -1,6 +1,6 @@
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, asc } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, departments } from "@/lib/db/schema";
 import { listInvites } from "@/lib/invites";
 import { requireSession } from "@/lib/auth-helpers";
 import {
@@ -27,6 +27,9 @@ import {
   changeRole,
   removeMember,
   transferOwnership,
+  createDepartment,
+  deleteDepartment,
+  setMemberDepartment,
 } from "./actions";
 
 export default async function TeamPage() {
@@ -39,10 +42,17 @@ export default async function TeamPage() {
       email: users.email,
       name: users.name,
       role: users.role,
+      departmentId: users.departmentId,
     })
     .from(users)
     .where(eq(users.workspaceId, wsId))
     .orderBy(desc(users.createdAt));
+
+  const depts = await db
+    .select()
+    .from(departments)
+    .where(eq(departments.workspaceId, wsId))
+    .orderBy(asc(departments.name));
 
   const invites = await listInvites(wsId);
   const pending = invites.filter((i) => !i.acceptedAt);
@@ -50,6 +60,7 @@ export default async function TeamPage() {
   const canInvite = can(session.role, "team.invite");
   const canChangeRole = can(session.role, "team.role.change");
   const canRemove = can(session.role, "team.remove");
+  const canManageDepts = can(session.role, "team.department.manage");
 
   return (
     <>
@@ -93,6 +104,34 @@ export default async function TeamPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {/* Department */}
+                      {canManageDepts && depts.length > 0 ? (
+                        <form
+                          action={setMemberDepartment.bind(null, m.id)}
+                          className="flex items-center gap-1"
+                        >
+                          <select
+                            name="departmentId"
+                            defaultValue={m.departmentId ?? ""}
+                            className="h-7 rounded-md border border-zinc-200 bg-white px-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+                          >
+                            <option value="">No department</option>
+                            {depts.map((d) => (
+                              <option key={d.id} value={d.id}>
+                                {d.name}
+                              </option>
+                            ))}
+                          </select>
+                          <Button type="submit" size="sm" variant="outline">
+                            Save
+                          </Button>
+                        </form>
+                      ) : m.departmentId ? (
+                        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                          {depts.find((d) => d.id === m.departmentId)?.name}
+                        </span>
+                      ) : null}
+
                       {/* Role display / edit */}
                       {canChangeRole && !isOwner && !isSelf ? (
                         <form
@@ -192,6 +231,66 @@ export default async function TeamPage() {
                 Your role doesn&apos;t allow inviting. Ask an admin or owner.
               </p>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Departments ─────────────────────────────────────── */}
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Departments ({depts.length})</CardTitle>
+            <CardDescription>
+              Assign members a department above. Resources are grouped by
+              department on the Resources page.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-2">
+              {depts.map((d) => (
+                <span
+                  key={d.id}
+                  className="flex items-center gap-1 rounded-full border border-zinc-200 px-3 py-1 text-sm dark:border-zinc-800"
+                >
+                  {d.name}
+                  {canManageDepts ? (
+                    <form action={deleteDepartment.bind(null, d.id)}>
+                      <button
+                        type="submit"
+                        title={`Delete ${d.name}`}
+                        className="ml-1 text-zinc-400 hover:text-red-600"
+                      >
+                        ×
+                      </button>
+                    </form>
+                  ) : null}
+                </span>
+              ))}
+              {depts.length === 0 ? (
+                <p className="text-sm text-zinc-500">
+                  No departments yet
+                  {canManageDepts ? " — create the first one below." : "."}
+                </p>
+              ) : null}
+            </div>
+            {canManageDepts ? (
+              <form
+                action={createDepartment}
+                className="mt-4 flex items-end gap-2"
+              >
+                <div className="grid gap-1.5">
+                  <Label htmlFor="dept-name">New department</Label>
+                  <Input
+                    id="dept-name"
+                    name="name"
+                    required
+                    placeholder="e.g. Publicity"
+                    className="w-56"
+                  />
+                </div>
+                <Button type="submit" variant="outline">
+                  Add
+                </Button>
+              </form>
+            ) : null}
           </CardContent>
         </Card>
 

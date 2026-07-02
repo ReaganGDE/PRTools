@@ -94,8 +94,11 @@ export const sentimentLabelEnum = pgEnum("sentiment_label", [
 
 export const socialPostStatusEnum = pgEnum("social_post_status", [
   "draft",
+  "pending_approval",
+  "approved",
   "scheduled",
   "posted",
+  "rejected",
   "failed",
 ]);
 
@@ -120,6 +123,9 @@ export const users = pgTable("users", {
     onDelete: "set null",
   }),
   role: userRoleEnum("role").default("member").notNull(),
+  departmentId: text("department_id").references(() => departments.id, {
+    onDelete: "set null",
+  }),
   createdAt: createdAt(),
 });
 
@@ -409,6 +415,8 @@ export const socialPosts = pgTable("social_posts", {
   workspaceId: text("workspace_id")
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
+  // Links sibling posts created together (one row per target platform/account)
+  groupId: text("group_id"),
   platform: platformEnum("platform").notNull(),
   status: socialPostStatusEnum("status").default("draft").notNull(),
   body: text("body").notNull(),
@@ -418,9 +426,89 @@ export const socialPosts = pgTable("social_posts", {
   externalId: text("external_id"),
   externalUrl: text("external_url"),
   error: text("error"),
+  // Approval flow
+  requestedApproverId: text("requested_approver_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  approvedById: text("approved_by_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  approvedAt: timestamp("approved_at"),
+  rejectedAt: timestamp("rejected_at"),
+  rejectionReason: text("rejection_reason"),
   createdBy: text("created_by").references(() => users.id),
   createdAt: createdAt(),
 });
+
+// Per-workspace toggles. One row per workspace.
+export const workspaceSettings = pgTable("workspace_settings", {
+  workspaceId: text("workspace_id")
+    .primaryKey()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  // If true, "member" role posts require approval before publishing/scheduling.
+  membersRequireApproval: boolean("members_require_approval")
+    .default(false)
+    .notNull(),
+  // Optional default approver picked when a member submits without choosing one.
+  defaultApproverId: text("default_approver_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  updatedAt: updatedAt(),
+});
+
+/* ─────────────── Departments & shared resources ─────────────── */
+
+export const departments = pgTable(
+  "departments",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("departments_ws_name_uq").on(t.workspaceId, t.name)],
+);
+
+// Shared logins & links (websites the team uses). Passwords are stored
+// encrypted (AES-256-GCM, see lib/crypto.ts) — never plaintext.
+// Table is named shared_resources because the database already contains an
+// unrelated legacy "resources" table.
+export const resources = pgTable(
+  "shared_resources",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    url: text("url").notNull(),
+    username: text("username"),
+    passwordEncrypted: text("password_encrypted"),
+    notes: text("notes"),
+    createdBy: text("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("shared_resources_workspace_idx").on(t.workspaceId)],
+);
+
+// Which departments a resource is useful for. Untagged = general/everyone.
+export const resourceDepartments = pgTable(
+  "resource_departments",
+  {
+    resourceId: text("resource_id")
+      .notNull()
+      .references(() => resources.id, { onDelete: "cascade" }),
+    departmentId: text("department_id")
+      .notNull()
+      .references(() => departments.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.resourceId, t.departmentId] })],
+);
 
 /* ─────────────── Suppression (unsubscribes) ─────────────── */
 
@@ -531,3 +619,5 @@ export type Campaign = typeof campaigns.$inferSelect;
 export type Send = typeof sends.$inferSelect;
 export type Mention = typeof mentions.$inferSelect;
 export type SocialPost = typeof socialPosts.$inferSelect;
+export type Department = typeof departments.$inferSelect;
+export type Resource = typeof resources.$inferSelect;

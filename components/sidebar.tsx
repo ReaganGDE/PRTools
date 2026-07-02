@@ -10,6 +10,7 @@ import {
   Settings,
   Mail,
   Home,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ const NAV = [
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/sentiment", label: "Sentiment", icon: BarChart3 },
   { href: "/social", label: "Social", icon: Megaphone },
+  { href: "/resources", label: "Resources", icon: KeyRound },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

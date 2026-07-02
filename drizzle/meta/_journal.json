@@ -15,6 +15,20 @@
       "when": 1778781181766,
       "tag": "0001_curious_justin_hammer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778783682514,
+      "tag": "0002_tan_mikhail_rasputin",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783003609631,
+      "tag": "0003_numerous_the_phantom",
+      "breakpoints": true
     }
   ]
 }

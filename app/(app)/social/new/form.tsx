@@ -12,48 +12,76 @@ const PLATFORMS = [
   { value: "instagram", label: "Instagram", working: false },
 ] as const;
 
-export function NewPostForm() {
-  const [platform, setPlatform] = useState<
-    "reddit" | "youtube" | "facebook" | "instagram"
-  >("reddit");
+type PlatformValue = (typeof PLATFORMS)[number]["value"];
+
+export function NewPostForm({
+  memberNeedsApproval,
+  approvers,
+  defaultApproverId,
+  canPublishDirectly,
+}: {
+  memberNeedsApproval: boolean;
+  approvers: { id: string; name: string | null; email: string; role: string }[];
+  defaultApproverId: string | null;
+  canPublishDirectly: boolean;
+}) {
+  const [selected, setSelected] = useState<Set<PlatformValue>>(
+    new Set(["reddit"]),
+  );
   const [scheduled, setScheduled] = useState(false);
+
+  function toggle(p: PlatformValue) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(p)) next.delete(p);
+      else next.add(p);
+      return next;
+    });
+  }
+
+  const needsReddit = selected.has("reddit");
 
   return (
     <form action={createPost} className="grid max-w-2xl gap-4">
       <div className="grid gap-2">
-        <Label>Platform</Label>
+        <Label>Platforms (pick one or many)</Label>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {PLATFORMS.map((p) => (
             <label
               key={p.value}
               className={`relative cursor-pointer rounded-md border p-3 text-sm ${
-                platform === p.value
+                selected.has(p.value)
                   ? "border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-900"
                   : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
               }`}
             >
               <input
-                type="radio"
-                name="platform"
+                type="checkbox"
+                name="platforms"
                 value={p.value}
-                checked={platform === p.value}
-                onChange={() => setPlatform(p.value)}
+                checked={selected.has(p.value)}
+                onChange={() => toggle(p.value)}
                 className="sr-only"
-                required
               />
               <div className="font-medium">{p.label}</div>
               {!p.working ? (
                 <div className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                  Coming
+                  Stub
                 </div>
               ) : null}
             </label>
           ))}
         </div>
+        {selected.size === 0 ? (
+          <p className="text-xs text-red-600">Pick at least one platform.</p>
+        ) : null}
       </div>
 
-      {platform === "reddit" ? (
-        <>
+      {needsReddit ? (
+        <fieldset className="grid gap-3 rounded-md border border-zinc-200 p-4 dark:border-zinc-800">
+          <legend className="px-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
+            Reddit-specific
+          </legend>
           <div className="grid gap-2">
             <Label htmlFor="subreddit">Subreddit (without r/)</Label>
             <Input
@@ -76,7 +104,7 @@ export function NewPostForm() {
               placeholder="https://… (leave blank for a text post)"
             />
           </div>
-        </>
+        </fieldset>
       ) : null}
 
       <div className="grid gap-2">
@@ -87,12 +115,14 @@ export function NewPostForm() {
           required
           rows={8}
           className="rounded-md border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-          placeholder={
-            platform === "reddit"
-              ? "Markdown supported. Skip if you provided a link URL above."
-              : "What do you want to say?"
-          }
+          placeholder="What do you want to say?"
         />
+        {selected.size > 1 ? (
+          <p className="text-xs text-zinc-500">
+            Same body posts to all selected platforms. Use the platform-specific
+            section above for Reddit only.
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-2">
@@ -114,17 +144,95 @@ export function NewPostForm() {
         ) : null}
       </div>
 
-      <div className="flex gap-2">
-        {scheduled ? (
-          <Button type="submit" name="action" value="schedule">
-            Schedule
+      {memberNeedsApproval ? (
+        <fieldset className="grid gap-2 rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/30">
+          <legend className="px-1 text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+            Approval required
+          </legend>
+          <p className="text-sm text-zinc-700 dark:text-zinc-200">
+            Your workspace requires admin approval before posts publish.
+          </p>
+          {approvers.length > 0 ? (
+            <div className="grid gap-1.5">
+              <Label htmlFor="requestedApproverId">Send to</Label>
+              <select
+                id="requestedApproverId"
+                name="requestedApproverId"
+                defaultValue={defaultApproverId ?? ""}
+                className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <option value="">— Any admin / owner —</option>
+                {approvers.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name ?? a.email} ({a.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+        </fieldset>
+      ) : (
+        <fieldset className="grid gap-1.5 rounded-md border border-zinc-200 p-4 dark:border-zinc-800">
+          <legend className="px-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
+            Optional: send to teammate for review
+          </legend>
+          <select
+            name="requestedApproverId"
+            defaultValue=""
+            className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+          >
+            <option value="">— No approval needed —</option>
+            {approvers.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name ?? a.email} ({a.role})
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-zinc-500">
+            Pick someone to send this for review. Leave as &quot;none&quot; to
+            publish/schedule directly.
+          </p>
+        </fieldset>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {memberNeedsApproval ? (
+          <Button
+            type="submit"
+            name="action"
+            value="approval"
+            disabled={selected.size === 0}
+          >
+            Submit for approval
           </Button>
         ) : (
           <>
-            <Button type="submit" name="action" value="publish">
-              Post now
-            </Button>
-            <Button type="submit" name="action" value="draft" variant="outline">
+            {scheduled ? (
+              <Button
+                type="submit"
+                name="action"
+                value="schedule"
+                disabled={selected.size === 0}
+              >
+                {canPublishDirectly ? "Schedule" : "Submit for approval"}
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                name="action"
+                value="publish"
+                disabled={selected.size === 0}
+              >
+                {canPublishDirectly ? "Post now" : "Submit for approval"}
+              </Button>
+            )}
+            <Button
+              type="submit"
+              name="action"
+              value="draft"
+              variant="outline"
+              disabled={selected.size === 0}
+            >
               Save as draft
             </Button>
           </>

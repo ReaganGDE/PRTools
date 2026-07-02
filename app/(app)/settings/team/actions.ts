@@ -1,9 +1,9 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, departments } from "@/lib/db/schema";
 import { requireSession, requireSessionWithCap } from "@/lib/auth-helpers";
 import { createInvite, revokeInvite } from "@/lib/invites";
 
@@ -113,5 +113,62 @@ export async function transferOwnership(newOwnerId: string) {
     .set({ role: "owner" })
     .where(eq(users.id, newOwnerId));
   revalidatePath("/settings/team");
+}
+
+/* ───────────────────── Departments ───────────────────── */
+
+export async function createDepartment(formData: FormData) {
+  const session = await requireSessionWithCap("team.department.manage");
+  const name = z.string().trim().min(1).parse(formData.get("name"));
+  await db
+    .insert(departments)
+    .values({ workspaceId: session.workspaceId, name })
+    .onConflictDoNothing();
+  revalidatePath("/settings/team");
+  revalidatePath("/resources");
+}
+
+export async function deleteDepartment(departmentId: string) {
+  const session = await requireSessionWithCap("team.department.manage");
+  await db
+    .delete(departments)
+    .where(
+      and(
+        eq(departments.id, departmentId),
+        eq(departments.workspaceId, session.workspaceId),
+      ),
+    );
+  revalidatePath("/settings/team");
+  revalidatePath("/resources");
+}
+
+export async function setMemberDepartment(userId: string, formData: FormData) {
+  const session = await requireSessionWithCap("team.department.manage");
+  const departmentId = String(formData.get("departmentId") ?? "");
+  const [target] = await db
+    .select({ workspaceId: users.workspaceId })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (!target || target.workspaceId !== session.workspaceId) {
+    throw new Error("User not found in this workspace");
+  }
+  if (departmentId) {
+    const [dept] = await db
+      .select({ id: departments.id })
+      .from(departments)
+      .where(
+        and(
+          eq(departments.id, departmentId),
+          eq(departments.workspaceId, session.workspaceId),
+        ),
+      );
+    if (!dept) throw new Error("Department not found");
+  }
+  await db
+    .update(users)
+    .set({ departmentId: departmentId || null })
+    .where(eq(users.id, userId));
+  revalidatePath("/settings/team");
+  revalidatePath("/resources");
 }
 
