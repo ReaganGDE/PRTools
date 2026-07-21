@@ -19,7 +19,9 @@ export default async function AnalyzePage() {
         <InfluencerTabs />
         <EngagementAnalyzer
           youtubeEnabled={Boolean(env.YOUTUBE_API_KEY)}
-          modashEnabled={Boolean(env.MODASH_API_KEY)}
+          modashEnabled={Boolean(
+            env.SCRAPECREATORS_API_KEY || env.MODASH_API_KEY,
+          )}
         />
       </div>
     </>

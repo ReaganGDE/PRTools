@@ -11,6 +11,10 @@ import {
   analyzeModash,
   type InfluencerAnalysis,
 } from "@/lib/integrations/influencer-analyzer";
+import {
+  scAnalyzeInstagram,
+  scAnalyzeTikTok,
+} from "@/lib/integrations/scrapecreators";
 import { getCached, setCached } from "@/lib/finder-cache";
 
 export type AnalyzeResult = {
@@ -49,13 +53,23 @@ export async function analyzeInfluencer(
       }
       analysis = await analyzeYouTube(input, env.YOUTUBE_API_KEY);
     } else {
-      if (!env.MODASH_API_KEY) {
+      // Prefer the cheap pay-as-you-go provider; fall back to Modash if set.
+      if (env.SCRAPECREATORS_API_KEY) {
+        analysis =
+          platform === "instagram"
+            ? await scAnalyzeInstagram(input, env.SCRAPECREATORS_API_KEY)
+            : await scAnalyzeTikTok(input, env.SCRAPECREATORS_API_KEY);
+        if (!analysis && env.MODASH_API_KEY) {
+          analysis = await analyzeModash(platform, input, env.MODASH_API_KEY);
+        }
+      } else if (env.MODASH_API_KEY) {
+        analysis = await analyzeModash(platform, input, env.MODASH_API_KEY);
+      } else {
         notes.push(
-          `${platform === "instagram" ? "Instagram" : "TikTok"} analysis needs a Modash/HypeAuditor key (MODASH_API_KEY).`,
+          `${platform === "instagram" ? "Instagram" : "TikTok"} analysis needs SCRAPECREATORS_API_KEY (pay-as-you-go, ~$10 per 5k lookups at scrapecreators.com) or MODASH_API_KEY.`,
         );
         return { analysis: null, alreadyTracked: false, notes };
       }
-      analysis = await analyzeModash(platform, input, env.MODASH_API_KEY);
     }
     if (analysis) await setCached(session.workspaceId, cacheKey, analysis);
   }

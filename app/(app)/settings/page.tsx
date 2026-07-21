@@ -53,6 +53,7 @@ export default async function SettingsPage() {
     { name: "Anthropic (sentiment scoring)", ok: isSet("ANTHROPIC_API_KEY"), phase: "Phase 5" },
     { name: "NewsAPI", ok: isSet("NEWS_API_KEY"), phase: "Phase 5" },
     { name: "Reddit OAuth", ok: isSet("REDDIT_CLIENT_ID"), phase: "Phase 4b" },
+    { name: "ScrapeCreators (IG/TikTok analysis)", ok: isSet("SCRAPECREATORS_API_KEY"), phase: "Influencers" },
     { name: "YouTube Data API", ok: isSet("YOUTUBE_API_KEY"), phase: "Phase 5/6" },
     { name: "Instagram Graph API", ok: isSet("META_APP_ID"), phase: "Phase 4b+ (optional)" },
     { name: "Inngest (background jobs)", ok: isSet("INNGEST_EVENT_KEY"), phase: "Phase 5" },

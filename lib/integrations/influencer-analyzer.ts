@@ -364,9 +364,21 @@ export async function fetchCurrentMetrics(tracked: {
     };
   }
   if (tracked.platform === "instagram" || tracked.platform === "tiktok") {
-    const key = process.env.MODASH_API_KEY;
-    if (!key) return null;
-    const a = await analyzeModash(tracked.platform, tracked.externalId, key);
+    const scKey = process.env.SCRAPECREATORS_API_KEY;
+    const modashKey = process.env.MODASH_API_KEY;
+    let a: InfluencerAnalysis | null = null;
+    if (scKey) {
+      const { scAnalyzeInstagram, scAnalyzeTikTok } = await import(
+        "./scrapecreators"
+      );
+      a =
+        tracked.platform === "instagram"
+          ? await scAnalyzeInstagram(tracked.externalId, scKey)
+          : await scAnalyzeTikTok(tracked.externalId, scKey);
+    }
+    if (!a && modashKey) {
+      a = await analyzeModash(tracked.platform, tracked.externalId, modashKey);
+    }
     if (!a) return null;
     return {
       followers: a.followers,

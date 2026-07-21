@@ -140,7 +140,7 @@ export function EngagementAnalyzer({
                   locked
                     ? p.id === "youtube"
                       ? "Requires YOUTUBE_API_KEY"
-                      : "Requires a Modash/HypeAuditor key (MODASH_API_KEY)"
+                      : "Requires SCRAPECREATORS_API_KEY (pay-as-you-go, ~$10 per 5k lookups) or MODASH_API_KEY"
                     : undefined
                 }
                 className={

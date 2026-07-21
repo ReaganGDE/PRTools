@@ -51,4 +51,8 @@ export const env = {
   // Influencer discovery for Instagram/TikTok (paid: Modash / HypeAuditor).
   // When unset, the influencer finder only searches YouTube.
   MODASH_API_KEY: optional("MODASH_API_KEY"),
+  // Cheap pay-as-you-go Instagram/TikTok profile data (scrapecreators.com,
+  // ~$10 per 5k lookups, credits never expire). Used by the engagement
+  // analyzer and tracked-influencer refresh; preferred over Modash when set.
+  SCRAPECREATORS_API_KEY: optional("SCRAPECREATORS_API_KEY"),
 };
