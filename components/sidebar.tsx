@@ -1,8 +1,9 @@
 "use client";
-import { useTransition } from "react";
+import { useMemo, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  ChevronDown,
   Users,
   Send,
   Inbox,
@@ -83,6 +84,26 @@ const ONBOARDING_NAV_GROUPS: typeof NAV_GROUPS = [
   },
 ];
 
+const COLLAPSED_KEY = "sidebar-collapsed";
+const COLLAPSED_EVENT = "sidebar-collapsed-change";
+
+function subscribeToCollapsed(cb: () => void): () => void {
+  window.addEventListener(COLLAPSED_EVENT, cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener(COLLAPSED_EVENT, cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+function readCollapsed(): string {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) ?? "{}";
+  } catch {
+    return "{}";
+  }
+}
+
 type ToolAccess = "all" | "pr_only" | "social_only";
 
 function sectionVisible(section: ToolSection, toolAccess: ToolAccess): boolean {
@@ -111,6 +132,32 @@ export function Sidebar({
   const pathname = usePathname();
   const [, startTransition] = useTransition();
   void startTransition;
+
+  // Collapsed state per labeled group, remembered across visits (and synced
+  // across tabs). Server render always shows everything expanded; the stored
+  // preference kicks in on hydration.
+  const collapsedRaw = useSyncExternalStore(
+    subscribeToCollapsed,
+    readCollapsed,
+    () => "{}",
+  );
+  const collapsed = useMemo<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(collapsedRaw);
+    } catch {
+      return {};
+    }
+  }, [collapsedRaw]);
+
+  function toggleGroup(label: string) {
+    const next = { ...collapsed, [label]: !collapsed[label] };
+    try {
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next));
+      window.dispatchEvent(new Event(COLLAPSED_EVENT));
+    } catch {
+      // Persistence is best-effort.
+    }
+  }
 
   const initials = (user.name ?? user.email ?? "?")
     .split(/[\s@.]/)
@@ -147,13 +194,40 @@ export function Sidebar({
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-4">
-        {visibleGroups.map((group, gi) => (
+        {visibleGroups.map((group, gi) => {
+          const isCollapsed = group.label ? !!collapsed[group.label] : false;
+          const containsActive = group.items.some(
+            ({ href }) =>
+              pathname === href ||
+              (href !== "/dashboard" && pathname.startsWith(href)),
+          );
+          return (
           <div key={gi}>
             {group.label ? (
-              <div className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
-                {group.label}
-              </div>
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.label!)}
+                aria-expanded={!isCollapsed}
+                className="group/header mb-1 flex w-full items-center justify-between rounded-md px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-600 transition-colors hover:text-zinc-400"
+              >
+                <span className="flex items-center gap-1.5">
+                  {group.label}
+                  {isCollapsed && containsActive && (
+                    <span
+                      className="h-1.5 w-1.5 rounded-full bg-red-500"
+                      title="Contains the current page"
+                    />
+                  )}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-3 w-3 text-zinc-600 transition-transform duration-150 group-hover/header:text-zinc-400",
+                    isCollapsed && "-rotate-90",
+                  )}
+                />
+              </button>
             ) : null}
+            {!isCollapsed && (
             <div className="space-y-0.5">
               {group.items.map(({ href, label, icon: Icon }) => {
                 const active =
@@ -184,8 +258,10 @@ export function Sidebar({
                 );
               })}
             </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* User */}
