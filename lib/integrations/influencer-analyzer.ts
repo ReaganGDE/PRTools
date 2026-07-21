@@ -363,22 +363,13 @@ export async function fetchCurrentMetrics(tracked: {
       engagementRate: a.engagementRate,
     };
   }
+  // Instagram/TikTok refreshes are credit-metered, so the tracked-influencer
+  // refresh action handles those itself (see tracked/actions.ts); this
+  // fallback only covers a Modash-configured deployment.
   if (tracked.platform === "instagram" || tracked.platform === "tiktok") {
-    const scKey = process.env.SCRAPECREATORS_API_KEY;
-    const modashKey = process.env.MODASH_API_KEY;
-    let a: InfluencerAnalysis | null = null;
-    if (scKey) {
-      const { scAnalyzeInstagram, scAnalyzeTikTok } = await import(
-        "./scrapecreators"
-      );
-      a =
-        tracked.platform === "instagram"
-          ? await scAnalyzeInstagram(tracked.externalId, scKey)
-          : await scAnalyzeTikTok(tracked.externalId, scKey);
-    }
-    if (!a && modashKey) {
-      a = await analyzeModash(tracked.platform, tracked.externalId, modashKey);
-    }
+    const key = process.env.MODASH_API_KEY;
+    if (!key) return null;
+    const a = await analyzeModash(tracked.platform, tracked.externalId, key);
     if (!a) return null;
     return {
       followers: a.followers,

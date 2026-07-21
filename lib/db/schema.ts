@@ -190,9 +190,37 @@ export const workspaces = pgTable("workspaces", {
   name: text("name").notNull(),
   airtableToken: text("airtable_token"),
   airtableBaseId: text("airtable_base_id"),
+  // ScrapeCreators (Instagram/TikTok profile data). Pay-as-you-go credits —
+  // the monthly limit is a self-imposed spending cap, adjustable in
+  // Settings → Integrations.
+  scrapecreatorsKey: text("scrapecreators_key"),
+  scrapecreatorsMonthlyLimit: integer("scrapecreators_monthly_limit")
+    .default(100)
+    .notNull(),
   followUpDays: integer("follow_up_days").default(4).notNull(),
   createdAt: createdAt(),
 });
+
+// Per-month API credit consumption, one row per (workspace, provider, month).
+export const apiUsage = pgTable(
+  "api_usage",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    period: text("period").notNull(), // "YYYY-MM"
+    used: integer("used").default(0).notNull(),
+  },
+  (t) => [
+    uniqueIndex("api_usage_ws_provider_period_uq").on(
+      t.workspaceId,
+      t.provider,
+      t.period,
+    ),
+  ],
+);
 
 export const workspaceInvites = pgTable(
   "workspace_invites",

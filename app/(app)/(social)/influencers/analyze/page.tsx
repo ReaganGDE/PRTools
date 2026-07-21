@@ -1,13 +1,15 @@
 import { requireSession } from "@/lib/auth-helpers";
 import { requireSectionAccess } from "@/lib/tool-access";
 import { env } from "@/lib/env";
+import { getScrapeCreatorsBudget } from "@/lib/api-budget";
 import { PageHeader } from "@/components/page-header";
 import { InfluencerTabs } from "../tabs";
 import { EngagementAnalyzer } from "./analyzer";
 
 export default async function AnalyzePage() {
   await requireSectionAccess("social");
-  await requireSession();
+  const session = await requireSession();
+  const scBudget = await getScrapeCreatorsBudget(session.workspaceId);
 
   return (
     <>
@@ -19,9 +21,7 @@ export default async function AnalyzePage() {
         <InfluencerTabs />
         <EngagementAnalyzer
           youtubeEnabled={Boolean(env.YOUTUBE_API_KEY)}
-          modashEnabled={Boolean(
-            env.SCRAPECREATORS_API_KEY || env.MODASH_API_KEY,
-          )}
+          modashEnabled={Boolean(scBudget.apiKey || env.MODASH_API_KEY)}
         />
       </div>
     </>

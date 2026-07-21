@@ -35,6 +35,43 @@ export async function clearAirtableConfig() {
   revalidatePath("/settings/integrations");
 }
 
+// ScrapeCreators (Instagram/TikTok profile data) — key + monthly credit cap.
+export async function saveScrapeCreatorsConfig(formData: FormData) {
+  const session = await requireSession();
+  const keyRaw = String(formData.get("apiKey") ?? "").trim();
+  const limitRaw = Number(formData.get("monthlyLimit") ?? NaN);
+
+  // Empty key means "keep existing" — same convention as the Airtable form.
+  const key = keyRaw.length > 0 ? keyRaw : undefined;
+  const monthlyLimit =
+    Number.isFinite(limitRaw) && limitRaw >= 0
+      ? Math.min(Math.floor(limitRaw), 1_000_000)
+      : undefined;
+
+  await db
+    .update(workspaces)
+    .set({
+      ...(key !== undefined ? { scrapecreatorsKey: key } : {}),
+      ...(monthlyLimit !== undefined
+        ? { scrapecreatorsMonthlyLimit: monthlyLimit }
+        : {}),
+    })
+    .where(eq(workspaces.id, session.workspaceId));
+
+  revalidatePath("/settings/integrations");
+  revalidatePath("/influencers/analyze");
+}
+
+export async function clearScrapeCreatorsConfig() {
+  const session = await requireSession();
+  await db
+    .update(workspaces)
+    .set({ scrapecreatorsKey: null })
+    .where(eq(workspaces.id, session.workspaceId));
+  revalidatePath("/settings/integrations");
+  revalidatePath("/influencers/analyze");
+}
+
 // Used by the brand settings to populate a dropdown of available tables.
 export async function listAirtableTables(): Promise<
   { id: string; name: string }[]

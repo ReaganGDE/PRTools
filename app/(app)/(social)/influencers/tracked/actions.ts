@@ -10,6 +10,14 @@ import {
 import { requireSession } from "@/lib/auth-helpers";
 import { assertSectionAccess } from "@/lib/tool-access";
 import { fetchCurrentMetrics } from "@/lib/integrations/influencer-analyzer";
+import {
+  scAnalyzeInstagram,
+  scAnalyzeTikTok,
+} from "@/lib/integrations/scrapecreators";
+import {
+  getScrapeCreatorsBudget,
+  tryConsumeScCredits,
+} from "@/lib/api-budget";
 
 export async function untrackInfluencer(id: string, _formData: FormData) {
   await assertSectionAccess("social");
@@ -38,9 +46,34 @@ export async function refreshAllMetrics(_formData?: FormData) {
     .from(trackedInfluencers)
     .where(eq(trackedInfluencers.workspaceId, session.workspaceId));
 
+  const budget = await getScrapeCreatorsBudget(session.workspaceId);
+
   for (const t of tracked) {
     try {
-      const m = await fetchCurrentMetrics(t);
+      let m: Awaited<ReturnType<typeof fetchCurrentMetrics>> = null;
+      // Instagram/TikTok via ScrapeCreators is credit-metered against the
+      // workspace's monthly cap; skip (not fail) once the cap is reached.
+      if (
+        (t.platform === "instagram" || t.platform === "tiktok") &&
+        budget.apiKey
+      ) {
+        if (await tryConsumeScCredits(session.workspaceId, 1)) {
+          const a =
+            t.platform === "instagram"
+              ? await scAnalyzeInstagram(t.externalId, budget.apiKey)
+              : await scAnalyzeTikTok(t.externalId, budget.apiKey);
+          if (a) {
+            m = {
+              followers: a.followers,
+              avgViews: a.avgViews,
+              avgLikes: a.avgLikes,
+              avgComments: a.avgComments,
+              engagementRate: a.engagementRate,
+            };
+          }
+        }
+      }
+      if (!m) m = await fetchCurrentMetrics(t);
       if (!m) continue;
       await db.insert(influencerSnapshots).values({
         trackedInfluencerId: t.id,
