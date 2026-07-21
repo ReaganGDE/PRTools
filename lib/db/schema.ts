@@ -547,6 +547,59 @@ export const mentions = pgTable(
   ],
 );
 
+/* ────────────────── Tracked influencers ────────────────── */
+
+// Influencers the workspace is actively monitoring (Upfluence-style roster).
+// Each metrics refresh appends an influencer_snapshots row so growth and
+// engagement trends can be charted over time.
+export const trackedInfluencers = pgTable(
+  "tracked_influencers",
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    platform: platformEnum("platform").notNull(),
+    // YouTube channel ID, or the username/handle for Instagram/TikTok.
+    externalId: text("external_id").notNull(),
+    name: text("name").notNull(),
+    handle: text("handle"),
+    url: text("url").notNull(),
+    thumbnail: text("thumbnail"),
+    notes: text("notes"),
+    createdBy: text("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("tracked_influencers_ws_ext_uq").on(
+      t.workspaceId,
+      t.platform,
+      t.externalId,
+    ),
+  ],
+);
+
+export const influencerSnapshots = pgTable(
+  "influencer_snapshots",
+  {
+    id: id(),
+    trackedInfluencerId: text("tracked_influencer_id")
+      .notNull()
+      .references(() => trackedInfluencers.id, { onDelete: "cascade" }),
+    followers: integer("followers").default(0).notNull(),
+    avgViews: integer("avg_views").default(0).notNull(),
+    avgLikes: integer("avg_likes").default(0).notNull(),
+    avgComments: integer("avg_comments").default(0).notNull(),
+    engagementRate: real("engagement_rate").default(0).notNull(),
+    capturedAt: timestamp("captured_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("influencer_snapshots_tracked_idx").on(t.trackedInfluencerId),
+  ],
+);
+
 /* ─────────────────────── Social posts ─────────────────────── */
 
 export const socialPosts = pgTable("social_posts", {
